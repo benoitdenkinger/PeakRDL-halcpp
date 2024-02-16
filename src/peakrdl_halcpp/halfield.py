@@ -20,6 +20,9 @@ class HalField(HalBase):
     def __init__(self, node: FieldNode, parent: 'HalReg'):
         super().__init__(node, parent)
 
+        # print(f'node addr_offset: {node.addr_offset}')
+        self.enums = self.get_enums(node) # type: ignore
+
     @property
     def width(self) -> int:
         return self._node.width
@@ -35,7 +38,7 @@ class HalField(HalBase):
             return "FieldRO"
         else:
             raise ValueError (f'Node field access rights are not found \
-                              {self._node.orig_type_name}')
+                              {self._node.inst_name}')
 
     @property
     def addr_offset(self) -> int:
@@ -46,3 +49,26 @@ class HalField(HalBase):
 
     def get_cls_tmpl_params(self, just_tmpl=False) -> str:
         assert False, "You should not extend FieldNode classes"
+
+    def get_enums(self, node):
+        encode = node.get_property('encode')
+        if encode is not None:
+            enum_cls_name = encode.__name__
+            print(f'Field {node.inst_name} has enum')
+            print(f'Type of enum {type(encode)}')
+            print(f'Type of enum.members {type(encode.members)}')
+            print(f'enum.members {encode.members}')
+            for k, v in encode.members.items():
+                print(f'{k}: {v}')
+                print(f'Enum members.name: {encode.members[k].name}')
+                print(f'Enum members.value: {encode.members[k].value}')
+                print(f'Enum members.rdl_desc: {encode.members[k].rdl_desc}')
+            print('---------------------------------')
+            for item in encode.members.items():
+                print(f'item: {item}')
+            print('---------------------------------')
+            for idx, item in enumerate(encode.members.items()):
+                print(f'item[{idx}]: {item}')
+                print(f'Type of item[{idx}]: {type(item)}')
+
+

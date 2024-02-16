@@ -1,4 +1,4 @@
-from typing import Union, Any, Optional
+from typing import Union, Any, Optional, Type
 from abc import ABC, abstractmethod, abstractproperty
 
 from systemrdl.node import Node, AddrmapNode
@@ -28,17 +28,40 @@ class HalBase(ABC):
     def __init__(self, node: Node, parent: Union['HalBase', None]):
         self._node = node
         self._parent = parent
+        # The bus offset is an extra address offset added to a subgroup of component
+        # when creating a addressmap containing only addressmap nodes (i.e., no register).
+        # By default, this intermediate addressmap component is removed by this plugin and
+        # its address is added to this bus offset variable.
+        self._bus_offset = 0
+
+    @property
+    def is_top_node(self) -> bool:
+        """Checks if this is the top node."""
+        return self._parent == None
+
+    @property
+    def addr_offset(self) -> int:
+        return self._bus_offset + self._node.address_offset
 
     @property
     def orig_type_name(self) -> str:
-        if self._node.orig_type_name is not None:
-            return self._node.orig_type_name
-        else:
-            return self._node.inst_name
+        """Returns the node original type name (not extended with parameter values)."""
+        return self._node.orig_type_name
+
+    @property
+    def inst_name(self) -> str:
+        """Returns the node instance name."""
+        # Top node returns a value (same than type_name and orig_type_name)
+        # even without an instance name.
+        return self._node.inst_name
 
     @property
     def type_name(self) -> str:
-        """Returns the node type name property."""
+        """Returns the node type name extended with parameter values. If the type
+        has no parameter, this value is equal to orig_type_name. If the declaration
+        is anonymous (i.e., direct instantiation without type specification), this
+        value is equal to inst_name.
+        """
         return self.orig_type_name
 
     @property
@@ -46,17 +69,6 @@ class HalBase(ABC):
         """Returns True if the node is an array."""
         return self._node.is_array
 
-    @abstractproperty
-    def addr_offset(self) -> int:
-        """Node address offset property (relative address to parent node).
-        It must be overloaded by the child class.
-
-        Returns
-        -------
-        int
-            Relative address offset to the parent node.
-        """
-        pass
 
     @abstractproperty
     def cpp_access_type(self) -> str:
@@ -86,8 +98,36 @@ class HalBase(ABC):
         return self._node.get_property(prop_name)
 
     def get_owning_addrmapnode(self) -> Optional[AddrmapNode]:
-        """Returns the AddrmapNode owning this one."""
+        """Returns the AddrmapNode (system-rdl class) owning this one."""
         return self._node.owning_addrmap
+
+    # def get_owning_halnode(self, owning_type: Type['HalBase'], halnode: Optional['HalBase'] = None) -> Optional[HalBase]:
+    #     """Returns the HalAddrmapNode (halcpp class) owning this one.
+
+    #     Parameters
+    #     ----------
+    #     owning_type: HalBase
+    #         Owning class type, e.g., HalAddrmap, HalRegfile.
+    #     halnode: Optional['HalBase']
+    #         Base halnode from which to search. By default its this one.
+    #     """
+    #     # If this node is the first caller, start with this one.
+    #     # Otherwise we are in a recursive search and use the given halnode.
+    #     if halnode is None:
+    #         halnode = self
+
+    #     # Return this node if it corresponds to the searched one
+    #     if isinstance(halnode, owning_type):
+    #         halnode_owner = self
+    #     # If top node is reached return None
+    #     elif self.is_top_node:
+    #         halnode_owner = None
+    #     # Otherwise recursively search for it by passing the parent
+    #     else:
+    #         parent_node = self.get_parent()
+    #         halnode_owner = self.get_owning_halnode(owning_type, parent_node)
+
+    #     return halnode_owner
 
     def get_parent(self) -> Union['HalBase', None]:
         """Returns this node parent."""

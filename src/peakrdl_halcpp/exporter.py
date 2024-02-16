@@ -6,7 +6,10 @@ import jinja2 as jj
 from systemrdl.node import RootNode, AddrmapNode
 
 from .haladdrmap import HalAddrmap
-from .halutils import HalUtils
+from .halutils import *
+from .myimpl import *
+
+
 
 
 class HalExporter():
@@ -91,17 +94,26 @@ class HalExporter():
             Keep AddrMapNodes containing only AddrMapNodes.
         """
 
-        # print("+++++++++++DEBUG+++++++++++++++")
-        # print(f'Node type: {type(node)}')
-        # print(f'Node: {node}')
-        # print(f'Node address offset: {node.inst.addr_offset}')
-        # print(f'Node original type name: {node.orig_type_name}')
-        # desc = "/*\n"
-        # if node.get_property('desc') is not None:
-        #     for l in node.get_property('desc').splitlines():
-        #         desc = desc + "* " + l + "\n"
-        # print(f'Node description:\n{desc}*/')
-        # print("+++++++++++++++++++++++++++++++")
+        print("+++++++++++DEBUG+++++++++++++++")
+        print(f'Node type: {type(node)}')
+        print(f'Node: {node}')
+        print(f'Node address offset: {node.inst.addr_offset}')
+        print(f'Node original type name: {node.orig_type_name}')
+        print(f'Node type name: {node.type_name}')
+        print(f'Node inst name: {node.inst_name}')
+        print("+++++++++++++++++++++++++++++++")
+        for child in node.children():
+            print(f'Child type: {type(child)}')
+            print(f'Child: {child}')
+            print(f'Child address offset: {child.inst.addr_offset}')
+            print(f'Child original type name: {child.orig_type_name}')
+            print(f'Child type name: {child.type_name}')
+            print(f'Child inst name: {child.inst_name}')
+            print("+++++++++++++++++++++++++++++++")
+        print("+++++++++++++++++++++++++++++++")
+
+        print("+++++++++++DEBUG+++++++++++++++")
+        print(f'Top node parent: {node.parent.parent}')
 
         # If it is the root node, skip to top addrmap
         if isinstance(node, RootNode):
@@ -119,6 +131,9 @@ class HalExporter():
             node=node,
             keep_buses=keep_buses,
         )
+
+        my_gen = MyListener(ext_modules)
+        my_gen.generate_hal(node)
 
         # print("+++++++++++DEBUG+++++++++++++++")
         # regnodes = halutils.get_unique_type_nodes(top.regs + top.get_regfiles_regs())

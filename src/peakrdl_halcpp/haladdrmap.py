@@ -55,10 +55,10 @@ class HalAddrmap(HalBase):
         """Check if this is the top node."""
         return self._parent == None
 
-    @property
-    def type_name(self) -> str:
-        """Return the node name with the '_hal' suffix"""
-        return self.orig_type_name + "_hal"
+    # @property
+    # def inst_name(self) -> str:
+    #     """Return the node name with the '_hal' suffix"""
+    #     return self.inst_name + "_hal"
 
     @property
     def cpp_access_type(self) -> str:

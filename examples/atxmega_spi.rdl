@@ -1,3 +1,23 @@
+addrmap atxmega_test #(
+    longint unsigned MYPARAM = 16
+)
+{
+    name = "ATXMEGA test addrmap";
+    desc = "Testing purpose";
+
+    default regwidth = 8;
+    default sw = rw;
+    default hw = rw;
+
+    reg {
+        name = "Test register";
+
+        field {
+            desc = "Test field";
+        } TESTFIELD[7:0] = 0;
+    } TEST_DATA @ 0x0;
+};
+
 
 addrmap atxmega_spi {
     name = "ATXMEGA SPI controller";
@@ -66,7 +86,7 @@ addrmap atxmega_spi {
         } IF[7:7] = 0;
     } STATUS @ 0x2;
 
-    reg {
+    reg THIS_REG_HAS_A_NAME {
         desc = "The DATA register is used for sending and receiving data.
         Writing to the register initiates the data transmission, and the byte
         written to the register will be shifted out on the SPI output line.
@@ -113,8 +133,8 @@ addrmap atxmega_spi {
         } TEST_REG2 @ 0x2;
     } TEST_REGFILE @ 0x4;
 
-    addrmap atxmega_test{
-        name = "ATXMEGA test addrmap";
+    addrmap {
+        name = "ATXMEGA anonynmous test addrmap";
         desc = "Testing purpose";
 
         default regwidth = 8;
@@ -128,9 +148,23 @@ addrmap atxmega_spi {
                 desc = "Test field";
             } TESTFIELD[7:0] = 0;
         } TEST_DATA @ 0x4;
-    } TEST_ADDRMAP @ 0x7;
+    } AN_TEST_ADDRMAP @ 0x7;
 
-    myaddrmap myaddrmap0 @0xC;
+    atxmega_test atxmega_test0 @0xC;
+
+    atxmega_test atxmega_test1 @0x10;
+
+    atxmega_test #(.MYPARAM(32)) atxmega_test2 @0x15;
+
+    myaddrmap myaddrmap0 @0x1A;
+
+    myaddrmap myaddrmap1;
+
+    // mem mytype {
+    //     mementries = 8;
+    //     memwidth   = 32;
+    // } external memory;
+
 };
 
 addrmap common {
@@ -147,21 +181,4 @@ addrmap foo {
 addrmap bar {
     common block_x;
     common block_y;
-};
-
-addrmap atxmega_test{
-    name = "ATXMEGA test addrmap";
-    desc = "Testing purpose";
-
-    default regwidth = 8;
-    default sw = rw;
-    default hw = rw;
-
-    reg {
-        name = "Test register";
-
-        field {
-            desc = "Test field";
-        } TESTFIELD[7:0] = 0;
-    } TEST_DATA @ 0x0;
 };

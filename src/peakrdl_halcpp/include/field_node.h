@@ -23,7 +23,7 @@ namespace halcpp
     class FieldBase
     {
     public:
-        /**/**
+        /**
          * @brief
          *
          */

@@ -5,7 +5,19 @@ import datetime
 from systemrdl.node import AddrmapNode
 
 from .halbase import HalBase
+from .halfield import HalField
 from .haladdrmap import HalAddrmap
+from .halnode import HalAddrmapNode
+
+# def get_owning_haladdrmap(self, node: HalBase) -> Union[HalBase, HalAddrmap]:
+#     """Returns the HalAddrmap object enclosing this node."""
+#     parent_node = node.get_parent()
+#     if isinstance(parent_node, HalAddrmap):
+#         return parent_node
+#     elif parent_node is not None:
+#         return self.get_owning_haladdrmap(parent_node)
+#     else:
+#         raise ValueError(f'No HalAddrmap parent found in the hierarchy.')
 
 
 class HalUtils():
@@ -39,25 +51,26 @@ class HalUtils():
         if the later exists.
         """
         has_extern = self.has_extern(halnode)
-        return halnode.orig_type_name + "_ext.h" if has_extern else halnode.type_name + ".h"
+        return halnode.inst_name + "_ext.h" if has_extern else halnode.inst_name + ".h"
 
     def has_extern(self, halnode: HalAddrmap) -> bool:
         """Returns True if the HAL node is listed as having extended functionalities."""
         if self.ext_modules is not None:
-            if halnode.orig_type_name in self.ext_modules:
+            if halnode.inst_name in self.ext_modules:
                 return True
         return False
 
     def get_extern(self, halnode: HalAddrmap) -> str:
         """Return the ??? name of the HAL node."""
         if self.has_extern(halnode):
-            return halnode.orig_type_name
-        return halnode.type_name
+            return halnode.inst_name
+        return halnode.inst_name + "_hal"
 
     def get_unique_type_nodes(self, halnode_lst: List[HalBase]):
         """Uniquify a python list?"""
         # Is this really necessary? You cannot have two nodes with the same name at the
         # same hierarchy level -> peakRDL throws an error
+        # But you can have multiple instances of a certain type
         return list({halnode.type_name: halnode for halnode in halnode_lst}.values())
 
     def generate_file_header(self) -> str:
@@ -78,7 +91,8 @@ class HalUtils():
         else:
             raise ValueError(f'No HalAddrmap parent found in the hierarchy.')
 
-    def get_node_enum(self, halnode: HalBase):
+
+    def get_node_enum(self, halnode: HalField):
         encode = halnode.get_property('encode')
         if encode is not None:
             haladdrmap_node = self.get_owning_haladdrmap(halnode)
