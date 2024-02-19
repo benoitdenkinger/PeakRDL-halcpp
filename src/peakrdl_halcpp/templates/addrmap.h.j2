@@ -12,19 +12,19 @@
 #pragma clang diagnostic ignored "-Wundefined-var-template"
 #endif
 
-{# Include the child nodes (i.e., the child addrmap ndoes) #}
-{% for c in halutils.get_unique_type_nodes(halnode.addrmaps) %}
-#include "{{ halutils.get_include_file(c) }}"
-{% endfor -%}
+{# Include the child addrmap nodes #}
+{% for child_addrmap in halnode.children_of_type(HalAddrmapNode) %}
+#include "{{ halutils.get_include_file(child_addrmap) }}"
+{% endfor %}
 
-namespace {{ halnode.inst_name}}_nm
+namespace {{ halnode.inst_name }}_nm
 {
     {#- ======== 1. Generate the registers ======== #}
-    {%- for r in halutils.get_unique_type_nodes(halnode.regs + halnode.get_regfiles_regs()) %}
+    {%- for r in halnode.children_of_type(HalRegNode) %}
 
     {# ======== 1.a Generate the enumeration class ======== #}
-    {% for f in r.fields %}
-    {% set has_enum, enum_name, enum_strings, enum_values, enum_desc, const_width = halutils.get_node_enum(f) %}
+    {% for f in r.children_of_type(HalFieldNode) %}
+    {% set has_enum, enum_name, enum_strings, enum_values, enum_desc, const_width = f.get_enums() %}
     {% if has_enum %}
     class {{ enum_name }}
     {
@@ -45,19 +45,58 @@ namespace {{ halnode.inst_name}}_nm
         using TYPE = {{ r.inst_name|upper }}{{ r.get_cls_tmpl_params() }};
 
     {# Add the fields to the register #}
-    {% for f in r.fields %}
-        static halcpp::{{ f.cpp_access_type }}<{{ f._node.low }}, {{ f._node.high }}, TYPE> {{ f._node.inst_name }};
+    {% for f in r.children_of_type(HalFieldNode) %}
+        static halcpp::{{ f.cpp_access_type }}<{{ f.low }}, {{ f.high }}, TYPE> {{ f.inst_name }};
     {% endfor %}
     {# Inherit the overloaded '=' operator from the base class if register can be write from software #}
-    {% if r._node.has_sw_writable %}
+    {% if r.has_sw_writable %}
 
         using halcpp::{{ r.cpp_access_type }}{{ r.get_cls_tmpl_params() }}::operator=;
     {% endif %}
     };
     {% endfor %}
 
-    {# ======== 2. Generate the register file classes ======== #}
-    {% for rf in halnode.regfiles %}
+    {#- ======== 2. Generate the registers from the register files ======== #}
+    {%- for rf in halnode.children_of_type(HalRegfileNode) %}
+    {%- for r in rf.children_of_type(HalRegNode) %}
+
+    {# ======== 2.a Generate the enumeration class ======== #}
+    {% for f in r.children_of_type(HalFieldNode) %}
+    {% set has_enum, enum_name, enum_strings, enum_values, enum_desc, const_width = f.get_enums() %}
+    {% if has_enum %}
+    class {{ enum_name }}
+    {
+    public:
+    {% for  s, v, d in enum_strings|zip(enum_values, enum_desc) %}
+        static const halcpp::Const<{{ const_width }}, {{ v }}> {{ s }}; // {{ d }}
+    {% endfor %}
+    };
+    {% endif %}
+    {% endfor %}
+
+    {# ======== 2.b Generate the register class ======== #}
+    {{ r.get_docstring() | indent(4)}}
+    {{ r.get_template_line() }}
+    class {{ r.inst_name|upper }} : public halcpp::{{ r.cpp_access_type }}{{ r.get_cls_tmpl_params() }}
+    {
+    public:
+        using TYPE = {{ r.inst_name|upper }}{{ r.get_cls_tmpl_params() }};
+
+    {# Add the fields to the register #}
+    {% for f in r.children_of_type(HalFieldNode) %}
+        static halcpp::{{ f.cpp_access_type }}<{{ f.low }}, {{ f.high }}, TYPE> {{ f.inst_name }};
+    {% endfor %}
+    {# Inherit the overloaded '=' operator from the base class if register can be write from software #}
+    {% if r.has_sw_writable %}
+
+        using halcpp::{{ r.cpp_access_type }}{{ r.get_cls_tmpl_params() }}::operator=;
+    {% endif %}
+    };
+    {% endfor %}
+    {% endfor %}
+
+    {# ======== 3. Generate the register file classes ======== #}
+    {% for rf in halnode.children_of_type(HalRegfileNode) %}
     {{ rf.get_docstring() }}
     {{ rf.get_template_line() }}
     class {{ rf.inst_name|upper }} : public halcpp::{{ rf.cpp_access_type }}{{ rf.get_cls_tmpl_params()}}
@@ -65,18 +104,14 @@ namespace {{ halnode.inst_name}}_nm
     public:
         using TYPE = {{ rf.inst_name|upper }}{{ rf.get_cls_tmpl_params() }};
 
-    {% for c in rf.regfiles + rf.regs %}
-        {% if c.__class__.__name__ == "HalRegfile" %}
-            {{ assert("Regfile inside Regfile Not supported yet") }}
-        {% else %}
-        static {{ c.inst_name|upper }}<0x{{ "%0x"|format(c.addr_offset|int) }}, {{ c.width }}, TYPE> {{ c._node.inst_name }};
-        {% endif %}
+    {% for c in halnode.children_of_type(HalRegNode) %}
+        static {{ c.inst_name|upper }}<0x{{ "%0x"|format(c.address_offset|int) }}, {{ c.width }}, TYPE> {{ c.inst_name }};
     {% endfor %}
     };
     {% endfor %}
 
-    {# ======== 3. Generate the memory classes ======== #}
-    {% for m in halutils.get_unique_type_nodes(halnode.mems) %}
+    {# ======== 4. Generate the memory classes ======== #}
+    {% for m in halnode.children_of_type(HalMemNode) %}
     {{ m.get_template_line() }}
     class {{ m.inst_name|upper }} : public MemNode{{ m.get_cls_tmpl_params() }}
     {
@@ -85,7 +120,7 @@ namespace {{ halnode.inst_name}}_nm
     {% endfor %}
 }
 
-{# ======== 4. Generate the top HAL class of an addrmap component ======== #}
+{# ======== 5. Generate the top HAL class of an addrmap component ======== #}
 {{ halnode.get_docstring() }}
 {{ halnode.get_template_line() }}
 class {{ halnode.inst_name|upper }} : public AddrmapNode<BASE, PARENT_TYPE>
@@ -93,17 +128,17 @@ class {{ halnode.inst_name|upper }} : public AddrmapNode<BASE, PARENT_TYPE>
 public:
     using TYPE = {{ halnode.inst_name|upper () }}{{ halnode.get_cls_tmpl_params() }};
 
-{% for c in halnode.addrmaps + halnode.regs + halnode.mems + halnode.regfiles %}
-    {% if c.__class__.__name__ == "HalArrReg" %}
-    static halcpp::RegArrayNode<{{ halnode.inst_name }}_nm::{{ c.inst_name|upper }}, 0x{{ "%0x"|format(c.addr_offset|int) }}, {{ c.width }}, {{ c._node.array_stride }}, TYPE , {{ c._node.array_dimensions|join(', ') }}> {{ c._node.inst_name }};
-    {% elif c.__class__.__name__ == "HalReg" or c.__class__.__name__ == "HalMem" %}
-    static {{ halnode.inst_name }}_nm::{{ c.inst_name|upper }}<0x{{ "%0x"|format(c.addr_offset|int) }}, {{ c.width }}, TYPE> {{ c._node.inst_name }};
-    {% elif c.__class__.__name__ == "HalArrRegfile" %}
-    static halcpp::RegfileArrayNode<{{ halnode.inst_name }}_nm::{{ c.inst_name|upper }}, 0x{{ "%0x"|format(c.addr_offset|int) }}, {{ c._node.array_stride }}, TYPE , {{ c._node.array_dimensions|join(', ') }}> {{ c._node.inst_name }};
-    {% elif c.__class__.__name__ == "HalRegfile" %}
-    static {{ halnode.inst_name }}_nm::{{ halutils.get_extern(c)|upper }}<0x{{ "%0x"|format(c.addr_offset|int) }}, TYPE> {{ c._node.inst_name }};
+{% for c in halnode.children() %}
+    {% if c.__class__ == "HalRegNode" and c.is_array %}
+    static halcpp::RegArrayNode<{{ halnode.inst_name }}_nm::{{ c.inst_name|upper }}, 0x{{ "%0x"|format(c.address_offset|int) }}, {{ c.width }}, {{ c.array_stride }}, TYPE , {{ c.array_dimensions|join(', ') }}> {{ c.inst_name }};
+    {% elif c.__class__.__name__ == "HalRegNode" or c.__class__.__name__ == "HalMem" %}
+    static {{ halnode.inst_name }}_nm::{{ c.inst_name|upper }}<0x{{ "%0x"|format(c.address_offset|int) }}, {{ c.width }}, TYPE> {{ c.inst_name }};
+    {% elif c.__class__ == "HalRegfileNode" and c.is_array %}
+    static halcpp::RegfileArrayNode<{{ halnode.inst_name }}_nm::{{ c.inst_name|upper }}, 0x{{ "%0x"|format(c.address_offset|int) }}, {{ c.array_stride }}, TYPE , {{ c.array_dimensions|join(', ') }}> {{ c.inst_name }};
+    {% elif c.__class__.__name__ == "HalRegfileNode" %}
+    static {{ halnode.inst_name }}_nm::{{ halutils.get_extern(c)|upper }}<0x{{ "%0x"|format(c.address_offset|int) }}, TYPE> {{ c.inst_name }};
     {% else %}
-    static {{ halutils.get_extern(c)|upper }}<0x{{ "%0x"|format(c.addr_offset|int) }}, TYPE> {{ c._node.inst_name }};
+    static {{ halutils.get_extern(c)|upper }}<0x{{ "%0x"|format(c.address_offset|int) }}, TYPE> {{ c.inst_name }};
     {% endif %}
 {% endfor %}
 };

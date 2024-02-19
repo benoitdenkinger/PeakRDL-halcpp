@@ -133,7 +133,8 @@ addrmap atxmega_spi {
         } TEST_REG2 @ 0x2;
     } TEST_REGFILE @ 0x4;
 
-    addrmap {
+    addrmap
+    {
         name = "ATXMEGA anonynmous test addrmap";
         desc = "Testing purpose";
 
@@ -164,6 +165,14 @@ addrmap atxmega_spi {
     //     mementries = 8;
     //     memwidth   = 32;
     // } external memory;
+
+    reg {
+        name = "Test register";
+
+        field {
+            desc = "Test field";
+        } TESTFIELD[7:0] = 0;
+    } LAST_REG;
 
 };
 

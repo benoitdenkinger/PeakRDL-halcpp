@@ -9,3 +9,5 @@ It is based on C++ 17<br/>
 
 #### For installation instruction click [here](https://risto97.github.io/PeakRDL-halcpp/docs/getting_started/installation).
 #### For an instruction on how to run a simple example click [here](https://risto97.github.io/PeakRDL-halcpp/docs/getting_started/example)
+
+Regfile in regfile not supported for now
