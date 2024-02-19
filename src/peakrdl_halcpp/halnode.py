@@ -119,11 +119,11 @@ class HalRegNode(HalBaseNode, RegNode):
 
     @property
     def cpp_access_type(self):
-        if self._node.has_sw_readable and self._node.has_sw_writable:
+        if self.has_sw_readable and self.has_sw_writable:
             return "RegRW"
-        elif self._node.has_sw_writable and not self._node.has_sw_readable:
+        elif self.has_sw_writable and not self.has_sw_readable:
             return "RegWO"
-        elif self._node.has_sw_readable:
+        elif self.has_sw_readable:
             return "RegRO"
         assert False
     
