@@ -29,21 +29,21 @@ class HalBaseNode(Node):
         return ""
 
     @staticmethod
-    def _factory(inst: Component, env: 'RDLEnvironment', parent: Optional['Node']=None) -> Optional['Node']:
+    def _factory(inst: Node, env: 'RDLEnvironment', parent: Optional['Node']=None) -> Optional['Node']:
 
-        if isinstance(inst, Field):
-            return HalFieldNode(FieldNode(inst, env, parent))
+        if isinstance(inst, FieldNode):
+            return HalFieldNode(inst)
         elif isinstance(inst, Reg):
-            return HalRegNode(RegNode(inst, env, parent))
-        elif isinstance(inst, Regfile):
-            return HalRegfileNode(RegfileNode(inst, env, parent))
-        elif isinstance(inst, Addrmap):
-            return HalAddrmapNode(AddrmapNode(inst, env, parent))
-        elif isinstance(inst, Mem):
-            return HalMemNode(MemNode(inst, env, parent))
-        elif isinstance(inst, Signal):
-            # Signals are not supported by this plugin
-            return None
+            return HalRegNode(inst)
+        elif isinstance(inst, RegfileNode):
+            return HalRegfileNode(inst)
+        elif isinstance(inst, AddrmapNode):
+            return HalAddrmapNode(inst)
+        elif isinstance(inst, MemNode):
+            return HalMemNode(inst)
+        # elif isinstance(inst, Signal):
+        #     # Signals are not supported by this plugin
+        #     return None
         else:
             raise RuntimeError
 
@@ -66,24 +66,24 @@ class HalBaseNode(Node):
 
     def children(self, unroll: bool=False, skip_not_present: bool=True) -> Iterator['Node']:
         print('++++++++++++++ children() ++++++++++++++ ')
-        for child_inst in self.inst.children:
-            print(child_inst)
-            if hasattr(child_inst, 'is_array'):
-                print(f'Is this an array? {child_inst.is_array}')
+        for child in super().children():
+            print(child)
+            if hasattr(child, 'is_array'):
+                print(f'Is this an array? {child.is_array}')
             else:
                 print('This node does not have is_array property')
             if skip_not_present:
                 # Check if property ispresent == False
-                if not child_inst.properties.get('ispresent', True):
+                if not child.properties.get('ispresent', True):
                     # ispresent was explicitly set to False. Skip it
                     continue
 
-            if unroll and isinstance(child_inst, AddressableComponent) and child_inst.is_array:
-                assert child_inst.array_dimensions is not None
+            if unroll and isinstance(child, AddressableNode) and child.is_array:
+                assert child.array_dimensions is not None
                 # Unroll the array
-                range_list = [range(n) for n in child_inst.array_dimensions]
+                range_list = [range(n) for n in child.array_dimensions]
                 for idxs in itertools.product(*range_list):
-                    N = HalBaseNode._factory(child_inst, self.env, self)
+                    N = HalBaseNode._factory(child, self.env, self)
                     # This check is needed to skip Signal components  (not supported)
                     if N is None:
                         print('Signal detected and avoided')
@@ -92,7 +92,7 @@ class HalBaseNode(Node):
                         N.current_idx = idxs  # type: ignore # pylint: disable=attribute-defined-outside-init
                         yield N
             else:
-                N = HalBaseNode._factory(child_inst, self.env, self)
+                N = HalBaseNode._factory(child, self.env, self)
                 # This check is needed to skip Signal components (not supported)
                 if N is None:
                     continue
