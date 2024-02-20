@@ -1,9 +1,10 @@
 from typing import Union, Any, Optional, Type, Iterator
 from abc import ABC, abstractmethod, abstractproperty
 import itertools
+import inspect
 
 from systemrdl.node import Node, RootNode, AddrmapNode, MemNode, RegfileNode, RegNode, FieldNode, AddressableNode
-from systemrdl.component import Component, AddressableComponent, Field, Reg, Regfile, Mem, Addrmap
+from systemrdl.component import Component, AddressableComponent, Signal, Field, Reg, Regfile, Mem, Addrmap
 
 class HalBaseNode(Node):
     # This class should not have any init function
@@ -18,9 +19,18 @@ class HalBaseNode(Node):
         """Return the node name with the '_hal' suffix"""
         return super().inst_name.lower() + "_hal"
 
+    def get_docstring(self) -> str:
+        """Converts the node description into a C++ multi-line comment."""
+        desc = "/*\n"
+        if self.get_property('desc') is not None:
+            for l in self.get_property('desc').splitlines():
+                desc = desc + " * " + l + "\n"
+            return desc + " */"
+        return ""
+
     @staticmethod
-    def _factory(inst: Component, env: 'RDLEnvironment', parent: Optional['Node']=None) -> 'Node':
-        
+    def _factory(inst: Component, env: 'RDLEnvironment', parent: Optional['Node']=None) -> Optional['Node']:
+
         if isinstance(inst, Field):
             return HalFieldNode(FieldNode(inst, env, parent))
         elif isinstance(inst, Reg):
@@ -31,11 +41,37 @@ class HalBaseNode(Node):
             return HalAddrmapNode(AddrmapNode(inst, env, parent))
         elif isinstance(inst, Mem):
             return HalMemNode(MemNode(inst, env, parent))
+        elif isinstance(inst, Signal):
+            # Signals are not supported by this plugin
+            return None
         else:
             raise RuntimeError
 
+    def unrolled(self) -> Iterator['Node']:
+        cls = type(self.super())
+        print('++++++++++++++ unrolled() ++++++++++++++')
+        print(cls)
+        if isinstance(self, AddressableNode) and self.is_array: # pylint: disable=no-member
+            print('It is an array from unrolled()')
+            # Is an array. Yield a Node object for each instance
+            range_list = [range(n) for n in self.array_dimensions] # pylint: disable=no-member
+            for idxs in itertools.product(*range_list):
+                N = cls(self.inst, self.env, self.parent)
+                N.current_idx = idxs # type: ignore
+                yield N
+        else:
+            # not an array. Nothing to unroll
+            print('Not an array from unrolled()')
+            yield cls(self.inst, self.env, self.parent)
+
     def children(self, unroll: bool=False, skip_not_present: bool=True) -> Iterator['Node']:
+        print('++++++++++++++ children() ++++++++++++++ ')
         for child_inst in self.inst.children:
+            print(child_inst)
+            if hasattr(child_inst, 'is_array'):
+                print(f'Is this an array? {child_inst.is_array}')
+            else:
+                print('This node does not have is_array property')
             if skip_not_present:
                 # Check if property ispresent == False
                 if not child_inst.properties.get('ispresent', True):
@@ -47,25 +83,49 @@ class HalBaseNode(Node):
                 # Unroll the array
                 range_list = [range(n) for n in child_inst.array_dimensions]
                 for idxs in itertools.product(*range_list):
-                    N = HalAddrmapNode._factory(child_inst, self.env, self)
-                    N.current_idx = idxs # type: ignore # pylint: disable=attribute-defined-outside-init
-                    yield N
+                    N = HalBaseNode._factory(child_inst, self.env, self)
+                    # This check is needed to skip Signal components  (not supported)
+                    if N is None:
+                        print('Signal detected and avoided')
+                        continue
+                    else:
+                        N.current_idx = idxs  # type: ignore # pylint: disable=attribute-defined-outside-init
+                        yield N
             else:
-                yield HalAddrmapNode._factory(child_inst, self.env, self)
+                N = HalBaseNode._factory(child_inst, self.env, self)
+                # This check is needed to skip Signal components (not supported)
+                if N is None:
+                    continue
+                else:
+                    yield N
 
     def children_of_type(self, children_type : 'Node', unroll: bool=False, skip_not_present: bool=True) -> Iterator['Node']:
         for child in self.children(unroll, skip_not_present):
             if isinstance(child, children_type):
                 yield child
 
-    def get_docstring(self) -> str:
-        """Converts the node description into a C++ multi-line comment."""
-        desc = "/*\n"
-        if self.get_property('desc') is not None:
-            for l in self.get_property('desc').splitlines():
-                desc = desc + " * " + l + "\n"
-            return desc + " */"
-        return ""
+    def descendants(self, unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False) -> Iterator['Node']:
+        for child in self.children(unroll, skip_not_present):
+            if in_post_order:
+                yield from child.descendants(unroll, skip_not_present, in_post_order)
+
+            yield child
+
+            if not in_post_order:
+                yield from child.descendants(unroll, skip_not_present, in_post_order)
+
+    def descendants_of_type(self, descendants_type : 'Node', unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False) -> Iterator['Node']:
+
+        for child in self.descendants(unroll, skip_not_present):
+            if isinstance(child, descendants_type):
+                if in_post_order:
+                    yield from child.descendants_of_type(descendants_type, unroll, skip_not_present, in_post_order)
+
+                yield child
+
+                if not in_post_order:
+                    yield from child.descendants_of_type(descendants_type, unroll, skip_not_present, in_post_order)
+
 
 class HalFieldNode(FieldNode):
     def __init__(self, node: FieldNode):
@@ -85,11 +145,11 @@ class HalFieldNode(FieldNode):
         else:
             raise ValueError (f'Node field access rights are not found \
                               {self.inst.inst_name}')
-    
+
     @property
     def address_offset(self) -> int:
         return self.bus_offset + super().address_offset
-    
+
     def get_enums(self):
         encode = self.get_property('encode')
         if encode is not None:
@@ -126,11 +186,34 @@ class HalRegNode(HalBaseNode, RegNode):
         elif self.has_sw_readable:
             return "RegRO"
         assert False
-    
+
     @property
     def address_offset(self) -> int:
-        return self.bus_offset + super().address_offset
-    
+        offset = self.bus_offset
+        print('++++++++ HalRegNode address_offset call ++++++++')
+        # curframe = inspect.currentframe()
+        # calframe = inspect.getouterframes(curframe, 2)
+        # print('caller name:', calframe[1][3])
+        # stack = inspect.stack()
+        # print("Call stack leading up to some_method():")
+        # print(*stack, sep='\n')
+        print(f'Node {type(self.inst)}')
+        print(f'is_array: {self.is_array}')
+        if self.is_array:
+            for inst in self.unrolled():
+                print('Loop over the array')
+                print(inst)
+                # offset += inst.address_offset
+        else:
+            print('No loop, not an array')
+            # offset += super().address_offset
+        print(f'address_offset: {offset}')
+        return offset
+        # if self.is_array:
+        #     return self.bus_offset + next(self.unrolled()).address_offset # type: ignore
+        # else:
+        #     return self.bus_offset + super().address_offset
+
     @property
     def width(self) -> int:
         return max([c.high for c in self.children_of_type(HalFieldNode)]) + 1
@@ -152,7 +235,7 @@ class HalRegfileNode(HalBaseNode, RegfileNode):
     @property
     def cpp_access_type(self):
         return "RegfileNode"
-    
+
     @property
     def address_offset(self) -> int:
         return self.bus_offset + super().address_offset

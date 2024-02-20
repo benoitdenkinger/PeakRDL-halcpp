@@ -94,26 +94,24 @@ class HalExporter():
             Keep AddrMapNodes containing only AddrMapNodes.
         """
 
-        # print("+++++++++++DEBUG+++++++++++++++")
-        # print(f'Node type: {type(node)}')
-        # print(f'Node: {node}')
-        # print(f'Node address offset: {node.inst.addr_offset}')
-        # print(f'Node original type name: {node.orig_type_name}')
-        # print(f'Node type name: {node.type_name}')
-        # print(f'Node inst name: {node.inst_name}')
-        # print("+++++++++++++++++++++++++++++++")
-        # for child in node.children():
-        #     print(f'Child type: {type(child)}')
-        #     print(f'Child: {child}')
-        #     print(f'Child address offset: {child.inst.addr_offset}')
-        #     print(f'Child original type name: {child.orig_type_name}')
-        #     print(f'Child type name: {child.type_name}')
-        #     print(f'Child inst name: {child.inst_name}')
-        #     print("+++++++++++++++++++++++++++++++")
-        # print("+++++++++++++++++++++++++++++++")
-
-        # print("+++++++++++DEBUG+++++++++++++++")
-        # print(f'Top node parent: {node.parent.parent}')
+        print("+++++++++++DEBUG+++++++++++++++")
+        print(f'Node type: {type(node)}')
+        print(f'Node: {node}')
+        print(f'Node address offset: {node.address_offset}')
+        print(f'Node original type name: {node.orig_type_name}')
+        print(f'Node type name: {node.type_name}')
+        print(f'Node inst name: {node.inst_name}')
+        print("+++++++++++++++++++++++++++++++")
+        for child in node.descendants(unroll=True):
+            print(f'Child type: {type(child)}')
+            print(f'Child: {child}')
+            if hasattr(child, 'address_offset'):
+                print(f'Child address offset: {child.address_offset}')
+            print(f'Child original type name: {child.orig_type_name}')
+            print(f'Child type name: {child.type_name}')
+            print(f'Child inst name: {child.inst_name}')
+            print("+++++++++++++++++++++++++++++++")
+        print("+++++++++++++++++++++++++++++++")
 
         # If it is the root node, skip to top addrmap
         if isinstance(node, RootNode):
@@ -139,10 +137,10 @@ class HalExporter():
                 pass
 
             # Iterate over all the HalAddrmap objects New class
-            print("+++++++++++DEBUG ITERATE OVER HALADDRMAPNODE+++++++++++++++")
-            concatenated_iterable = chain(top.children_of_type(HalAddrmapNode), top)
+            concatenated_iterable = chain(top.descendants_of_type(HalAddrmapNode), top)
             for halnode in concatenated_iterable:
-                # print(halnode)
+                print('++++++++++++ HALNODE ++++++++++++')
+                print(halnode)
                 # print(f'Halnode original type name: {halnode.orig_type_name}')
                 # print(f'Halnode type name: {halnode.type_name}')
                 # print(f'Halnode inst name: {halnode.inst_name}')
