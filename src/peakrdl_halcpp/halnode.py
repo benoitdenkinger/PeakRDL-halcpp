@@ -1,7 +1,12 @@
-from typing import Optional, Iterator
+from typing import TYPE_CHECKING, Optional, Iterator
 import itertools
 
-from systemrdl.node import Node, RootNode, AddrmapNode, MemNode, RegfileNode, RegNode, FieldNode, SignalNode,AddressableNode
+from systemrdl.node import Node, RootNode, AddrmapNode, MemNode, RegfileNode
+from systemrdl.node import RegNode, FieldNode, SignalNode, AddressableNode
+
+if TYPE_CHECKING:
+    from systemrdl.compiler import RDLEnvironment
+
 
 class HalBaseNode(Node):
     """HAL node base class. This class inherits from the systemrdl Node class."""
@@ -30,7 +35,7 @@ class HalBaseNode(Node):
         return ""
 
     @staticmethod
-    def _halfactory(inst: Node, env: 'RDLEnvironment', parent: Optional['Node']=None) -> Optional['Node']:
+    def _halfactory(inst: Node, env: 'RDLEnvironment', parent: Optional['Node'] = None) -> Optional['Node']:
         """HAL node factory method adapted from systemrdl Node class."""
         if isinstance(inst, FieldNode):
             return HalFieldNode(inst)
@@ -52,18 +57,19 @@ class HalBaseNode(Node):
     def halunrolled(self) -> Iterator['Node']:
         """HAL node unrolling method adapted from systemrdl Node class."""
         cls = type(self)
-        if isinstance(self, AddressableNode) and self.is_array: # pylint: disable=no-member
+        if isinstance(self, AddressableNode) and self.is_array:  # pylint: disable=no-member
             # Is an array. Yield a Node object for each instance
-            range_list = [range(n) for n in self.array_dimensions] # pylint: disable=no-member
+            range_list = [
+                range(n) for n in self.array_dimensions]  # pylint: disable=no-member
             for idxs in itertools.product(*range_list):
                 N = cls(self)
-                N.current_idx = idxs # type: ignore
+                N.current_idx = idxs  # type: ignore
                 yield N
         else:
             # Not an array. Nothing to unroll
             yield cls(self.inst, self.env, self.parent)
 
-    def halchildren(self, children_type: 'Node'=Node, unroll: bool=False, skip_not_present: bool=True, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
+    def halchildren(self, children_type: 'Node' = Node, unroll: bool = False, skip_not_present: bool = True, skip_buses: bool = False, bus_offset: int = 0) -> Iterator['Node']:
         """HAL children generator method wrapper around systemrdl Node.children method."""
         for child in self.children(unroll, skip_not_present):
             halchild = HalBaseNode._halfactory(child, self.env, self)
@@ -77,7 +83,7 @@ class HalBaseNode(Node):
                     halchild.bus_offset = bus_offset
                     yield halchild
 
-    def haldescendants(self, descendants_type: 'Node'=Node, unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
+    def haldescendants(self, descendants_type: 'Node' = Node, unroll: bool = False, skip_not_present: bool = True, in_post_order: bool = False, skip_buses: bool = False, bus_offset: int = 0) -> Iterator['Node']:
         """HAL node descedant generator adapted from systemrdl Node.descendants class."""
         for child in self.halchildren(descendants_type, unroll, skip_not_present, skip_buses, bus_offset):
             if isinstance(child, descendants_type):
@@ -115,7 +121,7 @@ class HalFieldNode(HalBaseNode, FieldNode):
         elif self.is_sw_readable:
             return "FieldRO"
         else:
-            raise ValueError (f'Node field access rights are not found \
+            raise ValueError(f'Node field access rights are not found \
                               {self.inst.inst_name}')
 
     def get_enums(self):
@@ -143,7 +149,6 @@ class HalFieldNode(HalBaseNode, FieldNode):
         return False, None, None, None, None, None
 
 
-
 class HalRegNode(HalBaseNode, RegNode):
     def __init__(self, node: RegNode):
         # Use the system-RDL AddrmapNode class initialization
@@ -166,7 +171,7 @@ class HalRegNode(HalBaseNode, RegNode):
     def address_offset(self) -> int:
         """Property adapted from systemrdl RegNode class to HalRegNode class."""
         if self.is_array and self.current_idx is None:
-            return self.bus_offset + next(self.halunrolled()).address_offset # type: ignore
+            return self.bus_offset + next(self.halunrolled()).address_offset
         else:
             return self.bus_offset + super().address_offset
 
@@ -206,7 +211,7 @@ class HalRegfileNode(HalBaseNode, RegfileNode):
     def address_offset(self) -> int:
         """Property adapted from systemrdl RegNode class to HalRegNode class."""
         if self.is_array and self.current_idx is None:
-            return self.bus_offset + next(self.halunrolled()).address_offset # type: ignore
+            return self.bus_offset + next(self.halunrolled()).address_offset
         else:
             return self.bus_offset + super().address_offset
 
@@ -234,8 +239,8 @@ class HalMemNode(HalBaseNode, MemNode):
             for c in self.parent.children():
                 if isinstance(c, AddressableNode):
                     assert c.inst == self.inst, (f"Addrmaps with anything else than "
-                                             "one memory node is currently not allowed, "
-                                             "it could be easily added")
+                                                 "one memory node is currently not allowed, "
+                                                 "it could be easily added")
 
     @property
     def address_offset(self) -> int:
@@ -292,4 +297,3 @@ class HalAddrmapNode(HalBaseNode, AddrmapNode):
         These parameters must match the the template returned by :func:`get_template_line`.
         """
         return "<BASE, PARENT_TYPE>"
-

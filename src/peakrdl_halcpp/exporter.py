@@ -10,8 +10,6 @@ from .halutils import *
 from .halnode import *
 
 
-
-
 class HalExporter():
     """HAL C++ PeakRDL plugin top class to generate the C++ HAL from SystemRDL description.
 
@@ -32,10 +30,11 @@ class HalExporter():
         #: HAL C++ copied header library location within the generated files output directory
         self.cpp_dir = "include"
 
-        filetype  = "*.h"
+        filetype = "*.h"
         abspaths = os.path.join(os.path.dirname(__file__), self.cpp_dir)
         #: HAL C++ headers list (copied into :attr:`~cpp_dir`)
-        self.base_headers = [f for f in os.listdir(abspaths) if f.endswith(filetype[1:])]
+        self.base_headers = [f for f in os.listdir(
+            abspaths) if f.endswith(filetype[1:])]
 
     def list_files(self, top: HalAddrmapNode, outdir: str, skip_buses: bool):
         """Prints the generated files to stdout (without generating the files).
@@ -115,24 +114,26 @@ class HalExporter():
                 pass
 
             # Iterate over all the decendants of the top HalAddrmap object
-            concatenated_iterable = chain(top.haldescendants(descendants_type=HalAddrmapNode, skip_buses=skip_buses), top)
+            concatenated_iterable = chain(top.haldescendants(
+                descendants_type=HalAddrmapNode, skip_buses=skip_buses), top)
 
             for halnode in concatenated_iterable:
                 context = {
                     'halnode': halnode,
                     'halutils': halutils,
                     'skip_buses': skip_buses,
-                    'HalAddrmapNode' : HalAddrmapNode,
-                    'HalMemNode' : HalMemNode,
-                    'HalRegfileNode' : HalRegfileNode,
-                    'HalRegNode' : HalRegNode,
-                    'HalFieldNode' : HalFieldNode,
+                    'HalAddrmapNode': HalAddrmapNode,
+                    'HalMemNode': HalMemNode,
+                    'HalRegfileNode': HalRegfileNode,
+                    'HalRegNode': HalRegNode,
+                    'HalFieldNode': HalFieldNode,
                 }
 
                 # The next lines generate the C++ header file for the
                 # HalAddrmap node using a jinja2 template.
                 text = self.process_template(context)
-                out_file = os.path.join(outdir, halnode.inst_name_hal.lower() + ".h")
+                out_file = os.path.join(
+                    outdir, halnode.inst_name_hal.lower() + ".h")
                 with open(out_file, 'w') as f:
                     f.write(text)
 

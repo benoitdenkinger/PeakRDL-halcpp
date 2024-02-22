@@ -47,4 +47,3 @@ class HalUtils():
         comment = f"// Generated with PeakRD-halcpp : https://github.com/Risto97/PeakRDL-halcpp\n"
         comment += f"// By user: {username} at: {current_datetime}\n"
         return comment
-
