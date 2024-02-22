@@ -62,7 +62,7 @@ class HalUtils():
     def get_extern(self, halnode: HalAddrmapNode) -> str:
         """Return the ??? name of the HAL node."""
         if self.has_extern(halnode):
-            return halnode.inst_name
+            return halnode.inst_name_hal + '_ext'
         return halnode.inst_name_hal
 
     # def get_unique_type_nodes(self, halnode_lst: List[HalBaseNode]):
