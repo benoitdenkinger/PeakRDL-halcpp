@@ -126,13 +126,16 @@ class HalExporter():
         # Create top HalAddrmapNode from top AddrmapNode
         top = HalAddrmapNode(node)
 
-        for child in top.haldescendants(skip_buses=skip_buses, bus_offset=0):
-            if not isinstance(child, HalFieldNode):
-                print(f'Child is {child} with address_offset {hex(child.address_offset)}')
-            # print(f'{child.is_bus}')
-            # print(f'{skip_buses}')
-            if child.is_bus and skip_buses:
-                print('Not working child {child} is a bus')
+        # for child in top.haldescendants():
+        #     if not isinstance(child, HalFieldNode):
+        #         print(f'Child is {child} with address_offset {hex(child.address_offset)}')
+        #     # print(f'{child.is_bus}')
+        #     # print(f'{skip_buses}')
+        #     if child.is_bus and skip_buses:
+        #         print('Not working child {child} is a bus')
+
+        for child in top.children_of_type(HalAddrmapNode, skip_buses=True):
+            print(f'Child is {child} with address_offset {hex(child.address_offset)}')
 
         # if list_files:
         #     # Only print the files that would be generated
