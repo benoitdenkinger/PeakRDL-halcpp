@@ -13,7 +13,7 @@
 #endif
 
 {# Include the child addrmap nodes #}
-{% for child_addrmap in halnode.children_of_type(children_type=HalAddrmapNode, skip_buses=skip_buses) %}
+{% for child_addrmap in halnode.halchildren(children_type=HalAddrmapNode, skip_buses=skip_buses) %}
 #include "{{ halutils.get_include_file(child_addrmap) }}"
 {% endfor -%}
 
@@ -25,10 +25,10 @@ namespace {{ halnode.inst_name }}_nm
     {%- set seen_enum_names = [] -%}
 
     {# ======== 1. Generate the registers ======== #}
-    {% for r in halnode.children_of_type(HalRegNode) %}
+    {% for r in halnode.halchildren(children_type=HalRegNode, skip_buses=skip_buses) %}
 
     {# ======== 1.a Generate the enumeration class ======== #}
-    {% for f in r.children_of_type(HalFieldNode) %}
+    {% for f in r.halchildren(children_type=HalFieldNode, skip_buses=skip_buses) %}
     {% set has_enum, enum_name, enum_strings, enum_values, enum_desc, const_width = f.get_enums() %}
     {% if has_enum and enum_name not in seen_enum_names %}
     {# Add enum_name to seen_enum_names set #}
@@ -46,13 +46,13 @@ namespace {{ halnode.inst_name }}_nm
     {# ======== 1.b Generate the register class ======== #}
     {{ r.get_docstring() | indent(4)}}
     {{ r.get_template_line() }}
-    class {{ r.orig_type_name|upper }} : public halcpp::{{ r.cpp_access_type }}{{ r.get_cls_tmpl_params() }}
+    class {{ r.inst_name|upper }} : public halcpp::{{ r.cpp_access_type }}{{ r.get_cls_tmpl_params() }}
     {
     public:
-        using TYPE = {{ r.orig_type_name|upper }}{{ r.get_cls_tmpl_params() }};
+        using TYPE = {{ r.inst_name|upper }}{{ r.get_cls_tmpl_params() }};
 
     {# Add the fields to the register #}
-    {% for f in r.children_of_type(HalFieldNode) %}
+    {% for f in r.halchildren(children_type=HalFieldNode, skip_buses=skip_buses) %}
         static halcpp::{{ f.cpp_access_type }}<{{ f.low }}, {{ f.high }}, TYPE> {{ f.inst_name }};
     {% endfor %}
     {# Inherit the overloaded '=' operator from the base class if register can be write from software #}
@@ -64,11 +64,11 @@ namespace {{ halnode.inst_name }}_nm
     {% endfor %}
 
     {# ======== 2. Generate the registers from the register files ======== #}
-    {% for rf in halnode.children_of_type(HalRegfileNode) %}
-    {% for r in rf.children_of_type(HalRegNode) %}
+    {% for rf in halnode.halchildren(children_type=HalRegfileNode, skip_buses=skip_buses) %}
+    {% for r in rf.halchildren(children_type=HalRegNode, skip_buses=skip_buses) %}
 
     {# ======== 2.a Generate the enumeration class ======== #}
-    {% for f in r.children_of_type(HalFieldNode) %}
+    {% for f in r.halchildren(children_type=HalFieldNode, skip_buses=skip_buses) %}
     {% set has_enum, enum_name, enum_strings, enum_values, enum_desc, const_width = f.get_enums() %}
     {% if has_enum and enum_name not in seen_enum_names %}
     {# Add enum_name to seen_enum_names set #}
@@ -86,13 +86,13 @@ namespace {{ halnode.inst_name }}_nm
     {# ======== 2.b Generate the register class ======== #}
     {{ r.get_docstring() | indent(4)}}
     {{ r.get_template_line() }}
-    class {{ r.orig_type_name|upper }} : public halcpp::{{ r.cpp_access_type }}{{ r.get_cls_tmpl_params() }}
+    class {{ r.inst_name|upper }} : public halcpp::{{ r.cpp_access_type }}{{ r.get_cls_tmpl_params() }}
     {
     public:
-        using TYPE = {{ r.orig_type_name|upper }}{{ r.get_cls_tmpl_params() }};
+        using TYPE = {{ r.inst_name|upper }}{{ r.get_cls_tmpl_params() }};
 
     {# Add the fields to the register #}
-    {% for f in r.children_of_type(HalFieldNode) %}
+    {% for f in r.halchildren(children_type=HalFieldNode, skip_buses=skip_buses) %}
         static halcpp::{{ f.cpp_access_type }}<{{ f.low }}, {{ f.high }}, TYPE> {{ f.inst_name }};
     {% endfor %}
     {# Inherit the overloaded '=' operator from the base class if register can be write from software #}
@@ -105,22 +105,22 @@ namespace {{ halnode.inst_name }}_nm
     {% endfor %}
 
     {# ======== 3. Generate the register file classes ======== #}
-    {% for rf in halnode.children_of_type(HalRegfileNode) %}
+    {% for rf in halnode.halchildren(children_type=HalRegfileNode, skip_buses=skip_buses) %}
     {{ rf.get_docstring() }}
     {{ rf.get_template_line() }}
-    class {{ rf.orig_type_name|upper }} : public halcpp::{{ rf.cpp_access_type }}{{ rf.get_cls_tmpl_params()}}
+    class {{ rf.inst_name|upper }} : public halcpp::{{ rf.cpp_access_type }}{{ rf.get_cls_tmpl_params()}}
     {
     public:
-        using TYPE = {{ rf.orig_type_name|upper }}{{ rf.get_cls_tmpl_params() }};
+        using TYPE = {{ rf.inst_name|upper }}{{ rf.get_cls_tmpl_params() }};
 
-    {% for c in halnode.children_of_type(HalRegNode) %}
-        static {{ c.orig_type_name|upper }}<0x{{ "%0x"|format(c.address_offset|int) }}, {{ c.width }}, TYPE> {{ c.orig_type_name }};
+    {% for c in halnode.halchildren(HalRegNode, skip_buses=skip_buses) %}
+        static {{ c.inst_name|upper }}<0x{{ "%0x"|format(c.address_offset|int) }}, {{ c.width }}, TYPE> {{ c.inst_name }};
     {% endfor %}
     };
     {% endfor %}
 
     {# ======== 4. Generate the memory classes ======== #}
-    {% for m in halnode.children_of_type(HalMemNode) %}
+    {% for m in halnode.halchildren(children_type=HalMemNode, skip_buses=skip_buses) %}
     {{ m.get_template_line() }}
     class {{ m.inst_name|upper }} : public MemNode{{ m.get_cls_tmpl_params() }}
     {
@@ -138,7 +138,7 @@ class {{ halnode.inst_name_hal|upper }} : public AddrmapNode<BASE, PARENT_TYPE>
 public:
     using TYPE = {{ halnode.inst_name_hal|upper () }}{{ halnode.get_cls_tmpl_params() }};
 
-{% for c in halnode.children_of_type(skip_buses=skip_buses) %}
+{% for c in halnode.halchildren(skip_buses=skip_buses) %}
     {% if c.__class__.__name__ == "HalRegNode" and c.is_array %}
     static halcpp::RegArrayNode<{{ halnode.inst_name }}_nm::{{ c.inst_name|upper }}, 0x{{ "%0x"|format(c.address_offset|int) }}, {{ c.width }}, {{ c.array_stride }}, TYPE , {{ c.array_dimensions|join(', ') }}> {{ c.inst_name }};
     {% elif c.__class__.__name__ == "HalRegNode" or c.__class__.__name__ == "HalMem" %}

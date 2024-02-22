@@ -63,49 +63,23 @@ class HalBaseNode(Node):
             # Not an array. Nothing to unroll
             yield cls(self.inst, self.env, self.parent)
 
-    def _halchildren(self, unroll: bool=False, skip_not_present: bool=True, bus_offset: int=0) -> Iterator['Node']:
-        """HAL children generator method adapted from systemrdl Node class."""
-        for child in self.children():
-            if skip_not_present:
-                if not child.get_property('ispresent'):
-                    # ispresent was explicitly set to False. Skip it
-                    continue
+    def halchildren(self, children_type: 'Node'=Node, unroll: bool=False, skip_not_present: bool=True, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
+        """HAL children generator method wrapper around systemrdl Node.children method."""
+        for child in self.children(unroll, skip_not_present):
+            halchild = HalBaseNode._halfactory(child, self.env, self)
 
-            if unroll and isinstance(child, AddressableNode) and child.is_array:
-                assert child.array_dimensions is not None
-                # Unroll the array
-                range_list = [range(n) for n in child.array_dimensions]
-                for idxs in itertools.product(*range_list):
-                    N = HalBaseNode._halfactory(child, self.env, self)
-                    if N is None:
-                        # This check is needed to skip Signal components (not supported)
-                        continue
-                    else:
-                        N.current_idx = idxs  # type: ignore # pylint: disable=attribute-defined-outside-init
-                        N.bus_offset = bus_offset
-                        yield N
-            else:
-                N = HalBaseNode._halfactory(child, self.env, self)
-                # This check is needed to skip Signal components (not supported)
-                if N is None:
-                    continue
-                else:
-                    N.bus_offset = bus_offset
-                    yield N
-
-    def children_of_type(self, children_type : 'Node'=Node, unroll: bool=False, skip_not_present: bool=True, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
-        for child in self._halchildren(unroll, skip_not_present, bus_offset):
-            if isinstance(child, children_type):
+            if isinstance(halchild, children_type):
                 child_bus_offset = 0
-                if skip_buses and child.is_bus:
-                    child_bus_offset = bus_offset + child.address_offset
-                    yield from child.children_of_type(children_type, unroll, skip_not_present, skip_buses, child_bus_offset)
+                if skip_buses and halchild.is_bus:
+                    child_bus_offset = bus_offset + halchild.address_offset
+                    yield from halchild.halchildren(children_type, unroll, skip_not_present, skip_buses, child_bus_offset)
                 else:
-                    yield child
+                    halchild.bus_offset = bus_offset
+                    yield halchild
 
     def haldescendants(self, descendants_type: 'Node'=Node, unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
-        """HAL node descedant generator adapted from systemrdl Node class."""
-        for child in self._halchildren(unroll, skip_not_present, bus_offset):
+        """HAL node descedant generator adapted from systemrdl Node.descendants class."""
+        for child in self.halchildren(descendants_type, unroll, skip_not_present, skip_buses, bus_offset):
             if isinstance(child, descendants_type):
                 child_bus_offset = 0
                 if skip_buses and self.is_bus:
@@ -198,7 +172,7 @@ class HalRegNode(HalBaseNode, RegNode):
 
     @property
     def width(self) -> int:
-        return max([c.high for c in self.children_of_type(HalFieldNode)]) + 1
+        return max([c.high for c in self.halchildren(HalFieldNode)]) + 1
 
     def get_template_line(self) -> str:
         """Returns the class template string."""
@@ -300,7 +274,7 @@ class HalAddrmapNode(HalBaseNode, AddrmapNode):
     @property
     def is_bus(self) -> bool:
         """Check if addrmap contains only addrmap"""
-        for child in self._halchildren():
+        for child in self.halchildren():
             if not isinstance(child, HalAddrmapNode):
                 return False
         return True
