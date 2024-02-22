@@ -35,22 +35,7 @@ class HalBaseNode(Node):
         if isinstance(inst, FieldNode):
             return HalFieldNode(inst)
         elif isinstance(inst, RegNode):
-            # debugpy.breakpoint()
-            node = HalRegNode(inst)
-            # node_tmp = HalRegNode(inst)
-            # print(f'Regnode: access rights:')
-            # print(f'Regnode: instance given')
-            # print(f'Regnode: sw read: {inst.has_sw_readable}')
-            # print(f'Regnode: sw write: {inst.has_sw_writable}')
-            # print(f'Regnode: instance created')
-            # print(f'Regnode: type: {type(node)}')
-            # print(f'Regnode: inst_name: {node_tmp.inst_name}')
-            # print(f'Regnode: sw read: ' + str(node_tmp.has_sw_readable))
-            # print(f'Regnode: sw write: ' + str(node_tmp.has_sw_writable))
-            # for field in node_tmp.children():
-            #     print(field)
-            return node
-            # return HalRegNode(inst)
+            return HalRegNode(inst)
         elif isinstance(inst, RegfileNode):
             return HalRegfileNode(inst)
         elif isinstance(inst, AddrmapNode):
@@ -82,18 +67,10 @@ class HalBaseNode(Node):
             # print('Not an array from halunrolled()')
             yield cls(self.inst, self.env, self.parent)
 
-    def halchildren(self, unroll: bool=False, skip_not_present: bool=True) -> Iterator['Node']:
+    def halchildren(self, unroll: bool=False, skip_not_present: bool=True, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
         # print('++++++++++++++ children() ++++++++++++++ ')
         for child in self.children():
-            # print(child)
-            # if hasattr(child, 'is_array'):
-            #     print(f'Is this an array? {child.is_array}')
-            # else:
-            #     print('This node does not have is_array property')
-            #     # continue
             if skip_not_present:
-                # Check if property ispresent == False
-                # print(f"child ispresent: {child.get_property('ispresent')}")
                 if not child.get_property('ispresent'):
                     # ispresent was explicitly set to False. Skip it
                     continue
@@ -105,8 +82,7 @@ class HalBaseNode(Node):
                 for idxs in itertools.product(*range_list):
                     N = HalBaseNode._halfactory(child, self.env, self)
                     if N is None:
-                        # This check is needed to skip Signal components  (not supported)
-                        # print('Signal detected and avoided')
+                        # This check is needed to skip Signal components (not supported)
                         continue
                     else:
                         N.current_idx = idxs  # type: ignore # pylint: disable=attribute-defined-outside-init
@@ -132,7 +108,6 @@ class HalBaseNode(Node):
             yield child
 
             if not in_post_order:
-                # debugpy.breakpoint()
                 yield from child.haldescendants(unroll, skip_not_present, in_post_order)
 
     def descendants_of_type(self, descendants_type : 'Node', unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False) -> Iterator['Node']:
@@ -151,8 +126,8 @@ class HalFieldNode(HalBaseNode, FieldNode):
     def __init__(self, node: FieldNode):
         # Use the system-RDL AddrmapNode class initialization
         super().__init__(node.inst, node.env, node.parent)
-        # TODO add as a parameter?
-        self.bus_offset = 0
+        # # TODO add as a parameter?
+        # self.bus_offset = 0
 
     @property
     def cpp_access_type(self) -> str:
@@ -166,9 +141,9 @@ class HalFieldNode(HalBaseNode, FieldNode):
             raise ValueError (f'Node field access rights are not found \
                               {self.inst.inst_name}')
 
-    @property
-    def address_offset(self) -> int:
-        return self.bus_offset + super().address_offset
+    # @property
+    # def address_offset(self) -> int:
+    #     return self.bus_offset + super().address_offset
 
     def get_enums(self):
         encode = self.get_property('encode')
@@ -205,49 +180,17 @@ class HalRegNode(HalBaseNode, RegNode):
             return "RegWO"
         elif self.has_sw_readable:
             return "RegRO"
-        # print(f'ERROR: Regnode access type not recognized')
-        # print(f'ERROR: sw read: {self.has_sw_readable}')
-        # print(f'ERROR: sw write: {self.has_sw_writable}')
         assert False
 
     @property
     def address_offset(self) -> int:
-        offset = self.bus_offset
-        # print('++++++++ HalRegNode address_offset call ++++++++')
-        # debugpy.breakpoint()
-        # curframe = inspect.currentframe()
-        # calframe = inspect.getouterframes(curframe, 2)
-        # print('caller name:', calframe[1][3])
-        # stack = inspect.stack()
-        # print("Call stack leading up to some_method():")
-        # print(*stack, sep='\n')
-        # print(f'Node {type(self.inst)}')
-        # print(f'is_array: {self.is_array}')
-        # print(f'Array index: {self.current_idx}')
         if self.is_array and self.current_idx is None:
-            for inst in self.halunrolled():
-                # print('Loop over the array')
-                # print(inst)
-                # print(f'Array index: {inst.current_idx}')
-                offset += inst.address_offset
+            return self.bus_offset + next(self.halunrolled()).address_offset # type: ignore
         else:
-            # print('No loop, not an array')
-            offset += super().address_offset
-        # print(f'address_offset: {offset}')
-        return offset
-        # if self.is_array:
-        #     return self.bus_offset + next(self.halunrolled()).address_offset # type: ignore
-        # else:
-        #     return self.bus_offset + super().address_offset
+            return self.bus_offset + super().address_offset
 
     @property
     def width(self) -> int:
-        # debugpy.breakpoint()
-        # width_list = []
-        # for c in self.children_of_type(HalFieldNode):
-        #     high = c.high
-        #     width_list.append(high)
-        # return max(width_list) + 1
         return max([c.high for c in self.children_of_type(HalFieldNode)]) + 1
 
     def get_template_line(self) -> str:
@@ -268,10 +211,6 @@ class HalRegfileNode(HalBaseNode, RegfileNode):
     def cpp_access_type(self):
         return "RegfileNode"
 
-    # @property
-    # def address_offset(self) -> int:
-    #     return self.bus_offset + super().address_offset
-
     @property
     def address_offset(self) -> int:
         if self.is_array and self.current_idx is None:
@@ -291,6 +230,8 @@ class HalMemNode(HalBaseNode, MemNode):
         # Use the system-RDL MemNode class initialization
         super().__init__(node.inst, node.env, node.parent)
 
+        self.bus_offset = 0
+
         # # Can this be removed?
         # if self.parent is not None:
         #     for c in self.parent.children():
@@ -298,6 +239,10 @@ class HalMemNode(HalBaseNode, MemNode):
         #             assert c == self.inst, (f"Addrmaps with anything else than "
         #                                      "one memory node is currently not allowed, "
         #                                      "it could be easily added")
+
+    @property
+    def address_offset(self) -> int:
+        return self.bus_offset + super().address_offset
 
     def get_template_line(self) -> str:
         return f"template <uint32_t BASE, uint32_t SIZE, typename PARENT_TYPE>"
@@ -311,10 +256,16 @@ class HalAddrmapNode(HalBaseNode, AddrmapNode):
         # Use the system-RDL AddrmapNode class initialization
         super().__init__(node.inst, node.env, node.parent)
 
+        self.bus_offset = 0
+
     @property
     def is_top_node(self) -> bool:
         """Checks if this is the top node."""
-        return self.parent == RootNode
+        return isinstance(self.parent, RootNode)
+
+    @property
+    def address_offset(self) -> int:
+        return self.bus_offset + super().address_offset
 
     @property
     def is_bus(self) -> bool:

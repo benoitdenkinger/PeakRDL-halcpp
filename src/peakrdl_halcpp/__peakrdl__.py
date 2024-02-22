@@ -34,8 +34,8 @@ class Exporter(ExporterSubcommandPlugin):
         )
 
         arg_group.add_argument(
-            "--keep-buses",
-            dest="keep_buses",
+            "--skip-buses",
+            dest="skip_buses",
             default=False,
             action="store_true",
             help="If there is an addrmap containing only addrmaps, not registers, by \
@@ -51,5 +51,5 @@ class Exporter(ExporterSubcommandPlugin):
             outdir=options.output,
             list_files=options.list_files,
             ext_modules=options.ext,
-            keep_buses=options.keep_buses,
+            skip_buses=options.skip_buses,
         )

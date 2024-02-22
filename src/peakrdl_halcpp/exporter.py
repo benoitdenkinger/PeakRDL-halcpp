@@ -76,7 +76,7 @@ class HalExporter():
                outdir: str,
                list_files: bool = False,
                ext_modules: List = [str],
-               keep_buses: bool = False
+               skip_buses: bool = True
                ) -> None:
         """Entry function called of the PeakRDL-halcpp plugin.
 
@@ -90,7 +90,7 @@ class HalExporter():
             Don't generate but print the files that would be generated.
         ext_modules: List[str]
             List of modules (i.e., SystemRDL addrmap objects) with extended functionalities.
-        keep_buses: bool = False
+        skip_buses: bool = False
             Keep AddrMapNodes containing only AddrMapNodes.
         """
 
@@ -138,6 +138,8 @@ class HalExporter():
 
             # Iterate over all the HalAddrmap objects New class
             concatenated_iterable = chain(top.descendants_of_type(HalAddrmapNode), top)
+            # Bus offset correction
+            bus_offset = 0
             for halnode in concatenated_iterable:
                 # print('++++++++++++ HALNODE ++++++++++++')
                 # print(halnode)
@@ -154,16 +156,35 @@ class HalExporter():
                     'halutils': halutils,
                 }
 
-                if halnode.is_bus:
-                    print(f'Halnode {halnode} is a bus')
-                    print(f'Halnode address offset: {halnode.address_offset}')
+                print(f'Current bus_offset: {bus_offset}')
+                print(f'Halnode: {halnode}')
+                print(f'Halnode parent: {halnode.parent}')
+                print(f'Halnode is top: {halnode.is_top_node}')
 
-                # The next lines generate the C++ header file for the
-                # HalAddrmap node using a jinja2 template.
-                text = self.process_template(context)
-                out_file = os.path.join(outdir, halnode.inst_name_hal.lower() + ".h")
-                with open(out_file, 'w') as f:
-                    f.write(text)
+                # Decide wether or not to generate the file
+                if (halnode.is_bus and not halnode.is_top_node) and skip_buses:
+                    generate_tmpl = False
+                    print(f'Halnode {halnode} is a bus and skipped')
+                else:
+                    generate_tmpl = True
+                    print(f'Halnode {halnode} is generated')
+
+                if generate_tmpl:
+                    # Add the bus offset if any
+                    halnode.bus_offset = bus_offset
+                    # The next lines generate the C++ header file for the
+                    # HalAddrmap node using a jinja2 template.
+                    text = self.process_template(context)
+                    out_file = os.path.join(outdir, halnode.inst_name_hal.lower() + ".h")
+                    with open(out_file, 'w') as f:
+                        f.write(text)
+                    # Reset the bus offset
+                    bus_offset = 0
+                else:
+                    # This node is a bus and we don't want to keep it
+                    bus_offset += halnode.address_offset
+
+
 
             # Copy the base header files (fixed code) to the output directory
             self.copy_base_headers(outdir)
