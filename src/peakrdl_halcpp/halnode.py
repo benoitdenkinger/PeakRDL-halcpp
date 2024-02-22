@@ -66,7 +66,7 @@ class HalBaseNode(Node):
             # not an array. Nothing to unroll
             yield cls(self.inst, self.env, self.parent)
 
-    def halchildren(self, unroll: bool=False, skip_not_present: bool=True, bus_offset: int=0) -> Iterator['Node']:
+    def _halchildren(self, unroll: bool=False, skip_not_present: bool=True, bus_offset: int=0) -> Iterator['Node']:
         # print('++++++++++++++ children() ++++++++++++++ ')
         for child in self.children():
             if skip_not_present:
@@ -96,47 +96,43 @@ class HalBaseNode(Node):
                     N.bus_offset = bus_offset
                     yield N
 
-    def children_of_type(self, children_type : 'Node', unroll: bool=False, skip_not_present: bool=True, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
-        for child in self.halchildren(unroll, skip_not_present, bus_offset):
+    def children_of_type(self, children_type : 'Node'=Node, unroll: bool=False, skip_not_present: bool=True, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
+        for child in self._halchildren(unroll, skip_not_present, bus_offset):
             if isinstance(child, children_type):
+                child_bus_offset = 0
                 if skip_buses and child.is_bus:
                     child_bus_offset = bus_offset + child.address_offset
                     yield from child.children_of_type(children_type, unroll, skip_not_present, skip_buses, child_bus_offset)
                 else:
                     yield child
 
-    def haldescendants(self, unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False) -> Iterator['Node']:
-        # if skip_buses and self.is_bus:
-        #     bus_offset += self.address_offset
-
-        for child in self.halchildren(unroll, skip_not_present):
-
-            if in_post_order:
-                yield from child.haldescendants(unroll, skip_not_present, in_post_order)
-
-            yield child
-
-            if not in_post_order:
-                yield from child.haldescendants(unroll, skip_not_present, in_post_order)
-
-    def descendants_of_type(self, descendants_type : 'Node', unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False) -> Iterator['Node']:
-        for child in self.haldescendants(unroll, skip_not_present):
+    def haldescendants(self, descendants_type: 'Node'=Node, unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
+        # for child in self._halchildren(unroll, skip_not_present, skip_buses, bus_offset):
+        for child in self._halchildren(unroll, skip_not_present, bus_offset):
             if isinstance(child, descendants_type):
-                if in_post_order:
-                    yield from child.descendants_of_type(descendants_type, unroll, skip_not_present, in_post_order)
+                child_bus_offset = 0
+                if skip_buses and self.is_bus:
+                    child_bus_offset = bus_offset + child.address_offset
 
-                yield child
+                if in_post_order:
+                    yield from child.haldescendants(descendants_type, unroll, skip_not_present, in_post_order, skip_buses, child_bus_offset)
+
+                if not (skip_buses and child.is_bus):
+                    yield child
 
                 if not in_post_order:
-                    yield from child.descendants_of_type(descendants_type, unroll, skip_not_present, in_post_order)
+                    yield from child.haldescendants(descendants_type, unroll, skip_not_present, in_post_order, skip_buses, child_bus_offset)
 
 
 class HalFieldNode(HalBaseNode, FieldNode):
     def __init__(self, node: FieldNode):
         # Use the system-RDL AddrmapNode class initialization
         super().__init__(node.inst, node.env, node.parent)
-        # # TODO add as a parameter?
-        # self.bus_offset = 0
+
+    @property
+    def address_offset(self) -> int:
+        # FieldNode does not have an address but to avoid extra check it returns 0
+        return 0
 
     @property
     def cpp_access_type(self) -> str:
@@ -149,10 +145,6 @@ class HalFieldNode(HalBaseNode, FieldNode):
         else:
             raise ValueError (f'Node field access rights are not found \
                               {self.inst.inst_name}')
-
-    # @property
-    # def address_offset(self) -> int:
-    #     return self.bus_offset + super().address_offset
 
     def get_enums(self):
         encode = self.get_property('encode')
@@ -279,7 +271,7 @@ class HalAddrmapNode(HalBaseNode, AddrmapNode):
     @property
     def is_bus(self) -> bool:
         """Check if addrmap contains only addrmap"""
-        for child in self.halchildren():
+        for child in self._halchildren():
             if not isinstance(child, HalAddrmapNode):
                 return False
         return True

@@ -13,7 +13,7 @@
 #endif
 
 {# Include the child addrmap nodes #}
-{% for child_addrmap in halnode.children_of_type(HalAddrmapNode) %}
+{% for child_addrmap in halnode.children_of_type(children_type=HalAddrmapNode, skip_buses=skip_buses) %}
 #include "{{ halutils.get_include_file(child_addrmap) }}"
 {% endfor -%}
 
@@ -136,9 +136,9 @@ namespace {{ halnode.inst_name }}_nm
 class {{ halnode.inst_name_hal|upper }} : public AddrmapNode<BASE, PARENT_TYPE>
 {
 public:
-    using TYPE = {{ halnode.inst_name|upper () }}{{ halnode.get_cls_tmpl_params() }};
+    using TYPE = {{ halnode.inst_name_hal|upper () }}{{ halnode.get_cls_tmpl_params() }};
 
-{% for c in halnode.halchildren() %}
+{% for c in halnode.children_of_type(children_type=HalAddrmapNode, skip_buses=skip_buses) %}
     {% if c.__class__.__name__ == "HalRegNode" and c.is_array %}
     static halcpp::RegArrayNode<{{ halnode.inst_name }}_nm::{{ c.inst_name|upper }}, 0x{{ "%0x"|format(c.address_offset|int) }}, {{ c.width }}, {{ c.array_stride }}, TYPE , {{ c.array_dimensions|join(', ') }}> {{ c.inst_name }};
     {% elif c.__class__.__name__ == "HalRegNode" or c.__class__.__name__ == "HalMem" %}

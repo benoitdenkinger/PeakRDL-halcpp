@@ -50,5 +50,5 @@ class Exporter(ExporterSubcommandPlugin):
             outdir=options.output,
             list_files=options.list_files,
             ext_modules=options.ext,
-            skip_buses=True, #options.skip_buses,
+            skip_buses=options.skip_buses,
         )
