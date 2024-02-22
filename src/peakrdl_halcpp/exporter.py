@@ -154,7 +154,9 @@ class HalExporter():
                     'halutils': halutils,
                 }
 
-                print(f'Halnode {halnode} is a bus: {halnode.is_bus}')
+                if halnode.is_bus:
+                    print(f'Halnode {halnode} is a bus')
+                    print(f'Halnode address offset: {halnode.address_offset}')
 
                 # The next lines generate the C++ header file for the
                 # HalAddrmap node using a jinja2 template.
