@@ -20,8 +20,8 @@ class Exporter(ExporterSubcommandPlugin):
         arg_group.add_argument(
             "--ext",
             nargs="*",
-            help="List of addrmap modules that have implemented <name>_EXT class in \
-                <name>_ext.h header file, used for extending functionality."
+            help="List of addrmap modules that have implemented <name>_HAL_EXT class in \
+                <name>_hal_ext.h header file, used for extending functionality."
         )
 
         arg_group.add_argument(

@@ -13,7 +13,7 @@ from .halnode import *
 
 
 class HalExporter():
-    """HAL C++ PeakRDL plugin top class to generate the C++ HAL from SystemRDL.
+    """HAL C++ PeakRDL plugin top class to generate the C++ HAL from SystemRDL description.
 
     Class methods:
 
@@ -37,7 +37,7 @@ class HalExporter():
         #: HAL C++ headers list (copied into :attr:`~cpp_dir`)
         self.base_headers = [f for f in os.listdir(abspaths) if f.endswith(filetype[1:])]
 
-    def list_files(self, top: HalAddrmapNode, outdir: str):
+    def list_files(self, top: HalAddrmapNode, outdir: str, skip_buses: bool):
         """Prints the generated files to stdout (without generating the files).
 
         Parameters
@@ -48,7 +48,7 @@ class HalExporter():
             Output directory in which the output files are generated.
         """
         gen_files = [os.path.join(outdir, addrmap.inst_name_hal + ".h")
-                     for addrmap in top.children_of_type(HalAddrmapNode)]
+                     for addrmap in top.haldescendants(HalAddrmapNode, skip_buses=skip_buses)]
         # Create base header files path
         base_files = [os.path.join(self.cpp_dir, x) for x in self.base_headers]
         # Add the base header files to the list of files
@@ -78,7 +78,7 @@ class HalExporter():
                ext_modules: List = [str],
                skip_buses: bool = False
                ):
-        """Entry function called of the PeakRDL-halcpp plugin.
+        """Main function of the plugin extension.
 
         Parameters
         ----------
@@ -94,9 +94,6 @@ class HalExporter():
             Keep AddrMapNodes containing only AddrMapNodes.
         """
 
-        # If it is the root node, skip to top addrmap
-        if isinstance(node, RootNode):
-            node = node.top
         # Check the node is an AddrmapNode object
         if not isinstance(node, AddrmapNode):
             raise TypeError(
@@ -107,15 +104,9 @@ class HalExporter():
         # Create top HalAddrmapNode from top AddrmapNode
         top = HalAddrmapNode(node)
 
-        # for child in top.haldescendants(descendants_type=HalAddrmapNode, skip_buses=skip_buses):
-        #     print(f'Descendant is {child} with address_offset {hex(child.address_offset)}')
-
-        # for child in top.children_of_type(HalAddrmapNode, skip_buses=skip_buses):
-        #     print(f'Child is {child} with address_offset {hex(child.address_offset)}')
-
         if list_files:
             # Only print the files that would be generated
-            self.list_files(top, outdir)
+            self.list_files(top, outdir, skip_buses)
         else:
             # Create the output directory for the generated files
             try:
@@ -123,19 +114,19 @@ class HalExporter():
             except FileExistsError:
                 pass
 
-            # Iterate over all the HalAddrmap objects
+            # Iterate over all the decendants of the top HalAddrmap object
             concatenated_iterable = chain(top.haldescendants(descendants_type=HalAddrmapNode, skip_buses=skip_buses), top)
 
             for halnode in concatenated_iterable:
                 context = {
                     'halnode': halnode,
+                    'halutils': halutils,
+                    'skip_buses': skip_buses,
                     'HalAddrmapNode' : HalAddrmapNode,
                     'HalMemNode' : HalMemNode,
                     'HalRegfileNode' : HalRegfileNode,
                     'HalRegNode' : HalRegNode,
                     'HalFieldNode' : HalFieldNode,
-                    'halutils': halutils,
-                    'skip_buses': skip_buses,
                 }
 
                 # The next lines generate the C++ header file for the
@@ -149,21 +140,20 @@ class HalExporter():
             self.copy_base_headers(outdir)
 
     def process_template(self, context: Dict) -> str:
-        """Generates a C++ header file based on a given HalAddrmap node and
-        a C++ header file jinja2 template.
+        """Generates a C++ header file based on a jinja2 template.
 
         Parameters
         ----------
         context: Dict
-            Dictionary containing a HalAddrmap node and the HalUtils object
-            passed to the jinja2 env
+            Dictionary containing a HalAddrmapNode and the HalUtils object
+            (and other variables) passed to the jinja2 env
 
         Returns
         -------
         str
             Text of the generated C++ header for a given HalAddrmap node.
         """
-        # Create a jinja2 env with the template(s) contained in the templates
+        # Create a jinja2 env with the template contained in the templates
         # folder located in the same directory than this file
         env = jj.Environment(
             loader=jj.FileSystemLoader(

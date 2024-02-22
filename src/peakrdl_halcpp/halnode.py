@@ -1,27 +1,23 @@
-from typing import Union, Any, Optional, Type, Iterator
-from abc import ABC, abstractmethod, abstractproperty
+from typing import Optional, Iterator
 import itertools
-import inspect
-import debugpy
 
 from systemrdl.node import Node, RootNode, AddrmapNode, MemNode, RegfileNode, RegNode, FieldNode, SignalNode,AddressableNode
-from systemrdl.component import Component, AddressableComponent, Signal, Field, Reg, Regfile, Mem, Addrmap
 
 class HalBaseNode(Node):
-    # This class should not have any init function
-    # This class can inherit from Node and the derived class from this one inherit from advanced node (e.g., AddrmapNode)
-    # because only Node class has an init function. If not, not sure this would work
+    """HAL node base class. This class inherits from the systemrdl Node class."""
 
     def __iter__(self):
+        # Make this class iterable
         yield self
 
     @property
     def inst_name_hal(self) -> str:
-        """Return the node name with the '_hal' suffix"""
+        """Return the node name with the '_hal' suffix."""
         return super().inst_name.lower() + "_hal"
 
     @property
     def is_bus(self) -> bool:
+        """Returns True if the HAL node is considered a bus (i.e., addrmap containing only addrmaps)."""
         return False
 
     def get_docstring(self) -> str:
@@ -35,7 +31,7 @@ class HalBaseNode(Node):
 
     @staticmethod
     def _halfactory(inst: Node, env: 'RDLEnvironment', parent: Optional['Node']=None) -> Optional['Node']:
-
+        """HAL node factory method adapted from systemrdl Node class."""
         if isinstance(inst, FieldNode):
             return HalFieldNode(inst)
         elif isinstance(inst, RegNode):
@@ -54,6 +50,7 @@ class HalBaseNode(Node):
             raise RuntimeError
 
     def halunrolled(self) -> Iterator['Node']:
+        """HAL node unrolling method adapted from systemrdl Node class."""
         cls = type(self)
         if isinstance(self, AddressableNode) and self.is_array: # pylint: disable=no-member
             # Is an array. Yield a Node object for each instance
@@ -63,11 +60,11 @@ class HalBaseNode(Node):
                 N.current_idx = idxs # type: ignore
                 yield N
         else:
-            # not an array. Nothing to unroll
+            # Not an array. Nothing to unroll
             yield cls(self.inst, self.env, self.parent)
 
     def _halchildren(self, unroll: bool=False, skip_not_present: bool=True, bus_offset: int=0) -> Iterator['Node']:
-        # print('++++++++++++++ children() ++++++++++++++ ')
+        """HAL children generator method adapted from systemrdl Node class."""
         for child in self.children():
             if skip_not_present:
                 if not child.get_property('ispresent'):
@@ -107,7 +104,7 @@ class HalBaseNode(Node):
                     yield child
 
     def haldescendants(self, descendants_type: 'Node'=Node, unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
-        # for child in self._halchildren(unroll, skip_not_present, skip_buses, bus_offset):
+        """HAL node descedant generator adapted from systemrdl Node class."""
         for child in self._halchildren(unroll, skip_not_present, bus_offset):
             if isinstance(child, descendants_type):
                 child_bus_offset = 0
@@ -136,6 +133,7 @@ class HalFieldNode(HalBaseNode, FieldNode):
 
     @property
     def cpp_access_type(self) -> str:
+        """C++ access right template selection."""
         if self.is_sw_readable and self.is_sw_writable:
             return "FieldRW"
         elif self.is_sw_writable and not self.is_sw_readable:
@@ -147,6 +145,12 @@ class HalFieldNode(HalBaseNode, FieldNode):
                               {self.inst.inst_name}')
 
     def get_enums(self):
+        """Returns the enumeration(s) of a FieldNode.
+
+        Inside an addrmap node, all enumerations must have a different name.
+        The jinja template used to create the C++ header is filtering enumeration
+        with already existing name.
+        """
         encode = self.get_property('encode')
         if encode is not None:
             enum_cls_name = encode.type_name
@@ -170,11 +174,12 @@ class HalRegNode(HalBaseNode, RegNode):
     def __init__(self, node: RegNode):
         # Use the system-RDL AddrmapNode class initialization
         super().__init__(node.inst, node.env, node.parent)
-        # TODO add as a parameter?
+
         self.bus_offset = 0
 
     @property
     def cpp_access_type(self):
+        """C++ access right template selection."""
         if self.has_sw_readable and self.has_sw_writable:
             return "RegRW"
         elif self.has_sw_writable and not self.has_sw_readable:
@@ -185,6 +190,7 @@ class HalRegNode(HalBaseNode, RegNode):
 
     @property
     def address_offset(self) -> int:
+        """Property adapted from systemrdl RegNode class to HalRegNode class."""
         if self.is_array and self.current_idx is None:
             return self.bus_offset + next(self.halunrolled()).address_offset # type: ignore
         else:
@@ -195,9 +201,14 @@ class HalRegNode(HalBaseNode, RegNode):
         return max([c.high for c in self.children_of_type(HalFieldNode)]) + 1
 
     def get_template_line(self) -> str:
+        """Returns the class template string."""
         return f"template <uint32_t BASE, uint32_t WIDTH, typename PARENT_TYPE>"
 
     def get_cls_tmpl_params(self) -> str:
+        """Returns the class template parameter string.
+
+        These parameters must match the the template returned by :func:`get_template_line`.
+        """
         return "<BASE, WIDTH, PARENT_TYPE>"
 
 
@@ -205,24 +216,35 @@ class HalRegfileNode(HalBaseNode, RegfileNode):
     def __init__(self, node: RegfileNode):
         # Use the system-RDL AddrmapNode class initialization
         super().__init__(node.inst, node.env, node.parent)
-        # TODO add as a parameter?
+
         self.bus_offset = 0
 
     @property
     def cpp_access_type(self):
+        """C++ access right template selection.
+
+        For RegfileNodes, the access rights are selected at lower
+        levels (e.g., registers).
+        """
         return "RegfileNode"
 
     @property
     def address_offset(self) -> int:
+        """Property adapted from systemrdl RegNode class to HalRegNode class."""
         if self.is_array and self.current_idx is None:
             return self.bus_offset + next(self.halunrolled()).address_offset # type: ignore
         else:
             return self.bus_offset + super().address_offset
 
     def get_template_line(self) -> str:
+        """Returns the class template string."""
         return f"template <uint32_t BASE, typename PARENT_TYPE>"
 
     def get_cls_tmpl_params(self) -> str:
+        """Returns the class template parameter string.
+
+        These parameters must match the the template returned by :func:`get_template_line`.
+        """
         return "<BASE, PARENT_TYPE>"
 
 
@@ -233,22 +255,28 @@ class HalMemNode(HalBaseNode, MemNode):
 
         self.bus_offset = 0
 
-        # # Can this be removed?
-        # if self.parent is not None:
-        #     for c in self.parent.children():
-        #         if isinstance(c, AddressableNode):
-        #             assert c == self.inst, (f"Addrmaps with anything else than "
-        #                                      "one memory node is currently not allowed, "
-        #                                      "it could be easily added")
+        # Memory component instantiation is limited for simplicity
+        if self.parent is not None:
+            for c in self.parent.children():
+                if isinstance(c, AddressableNode):
+                    assert c.inst == self.inst, (f"Addrmaps with anything else than "
+                                             "one memory node is currently not allowed, "
+                                             "it could be easily added")
 
     @property
     def address_offset(self) -> int:
+        """Property adapted HalRegNode class."""
         return self.bus_offset + super().address_offset
 
     def get_template_line(self) -> str:
+        """Returns the class template string."""
         return f"template <uint32_t BASE, uint32_t SIZE, typename PARENT_TYPE>"
 
     def get_cls_tmpl_params(self) -> str:
+        """Returns the class template parameter string.
+
+        These parameters must match the the template returned by :func:`get_template_line`.
+        """
         return "<BASE, SIZE, PARENT_TYPE>"
 
 
@@ -256,7 +284,7 @@ class HalAddrmapNode(HalBaseNode, AddrmapNode):
     def __init__(self, node: AddrmapNode):
         # Use the system-RDL AddrmapNode class initialization
         super().__init__(node.inst, node.env, node.parent)
-
+        #: The bus offset is used for address offset correction when the --skip-buses option is used
         self.bus_offset = 0
 
     @property
@@ -266,6 +294,7 @@ class HalAddrmapNode(HalBaseNode, AddrmapNode):
 
     @property
     def address_offset(self) -> int:
+        """Property adapted HalRegNode class."""
         return self.bus_offset + super().address_offset
 
     @property
@@ -277,10 +306,16 @@ class HalAddrmapNode(HalBaseNode, AddrmapNode):
         return True
 
     def get_template_line(self) -> str:
+        """Returns the class template string."""
         if self.is_top_node:
             # Parent is set to void by default for the top node
             return "template <uint32_t BASE, typename PARENT_TYPE=void>"
         return "template <uint32_t BASE, typename PARENT_TYPE>"
 
     def get_cls_tmpl_params(self) -> str:
+        """Returns the class template parameter string.
+
+        These parameters must match the the template returned by :func:`get_template_line`.
+        """
         return "<BASE, PARENT_TYPE>"
+
