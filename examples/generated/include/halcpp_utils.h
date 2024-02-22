@@ -4,48 +4,129 @@
 #include <type_traits>
 #include <cstdint>
 
-namespace halcpp{
+namespace halcpp
+{
 
-template<uint32_t WIDTH, uint32_t VAL>
-class Const{
-public:
-    using dataType =
-        typename std::conditional<(WIDTH) <= 8, uint8_t,
-                                  typename std::conditional<(WIDTH) <= 16,
-                                                            uint16_t, uint32_t>::type>::type;
-    static constexpr dataType val = VAL;
-    static constexpr uint32_t width = WIDTH;
+    /**
+     * @brief Template class representing a constant value with a specified width.
+     *
+     * This class template allows defining a constant value with a specified width.
+     * The width is provided as a template parameter, and the value itself is provided
+     * as a template argument.
+     *
+     * @tparam WIDTH The width of the constant value in bits.
+     * @tparam VAL The value of the constant.
+     */
+    template <uint32_t WIDTH, uint32_t VAL>
+    class Const
+    {
+    public:
+        /** Type alias for the data type of the constant value. */
+        using dataType = typename std::conditional<(WIDTH) <= 8, uint8_t,
+                                                   typename std::conditional<(WIDTH) <= 16, uint16_t,
+                                                                             uint32_t>::type>::type;
 
-    template<uint32_t OTHER_WIDTH, uint32_t OTHER_VAL>
-    // inline const Const<OTHER_WIDTH+WIDTH, (OTHER_VAL << WIDTH) | VAL> operator,(const Const<OTHER_WIDTH, OTHER_VAL> &a) const{
-        // return Const<OTHER_WIDTH+WIDTH, (OTHER_VAL << WIDTH) | VAL>();
-    inline const Const<OTHER_WIDTH+WIDTH, (VAL << OTHER_WIDTH) | OTHER_VAL> operator,([[maybe_unused]]const Const<OTHER_WIDTH, OTHER_VAL> &a) const{
-        return Const<OTHER_WIDTH+WIDTH, (VAL << OTHER_WIDTH) | OTHER_VAL>();
-    }
+        static constexpr dataType val = VAL;
+        static constexpr uint32_t width = WIDTH;
 
-};
+        /**
+         * @brief Concatenation operator ',' to concatenate constants.
+         *
+         * This operator concatenates two constant values and returns a new
+         * constant with the combined width and value.
+         *
+         * @tparam OTHER_WIDTH The width of the other constant to concatenate.
+         * @tparam OTHER_VAL The value of the other constant to concatenate.
+         * @param a The other constant to concatenate.
+         * @return A new constant with the concatenated width and value.
+         */
+        template <uint32_t OTHER_WIDTH, uint32_t OTHER_VAL>
+        inline const Const<OTHER_WIDTH + WIDTH, (VAL << OTHER_WIDTH) | OTHER_VAL> operator,([[maybe_unused]] const Const<OTHER_WIDTH, OTHER_VAL> &a) const
+        {
+            return Const<OTHER_WIDTH + WIDTH, (VAL << OTHER_WIDTH) | OTHER_VAL>();
+        }
+    };
 
-template <class LIB, class = void>
-struct node_has_set : std::false_type {};
+    /**
+     * @brief Type trait to check if a type has a `set` member function.
+     *
+     * This type trait checks if a given type has a member function named `has_set`.
+     * It is used to determine if a type supports the `set` operation.
+     *
+     * @tparam TYPE The type to check.
+     */
+    template <class TYPE, class = void>
+    struct node_has_set : std::false_type
+    {
+    };
 
-template <class LIB>
-struct node_has_set<LIB,
-                    std::enable_if_t<std::is_invocable_r<bool, decltype(LIB::has_set)>::value>>
-    : std::integral_constant<bool, LIB::has_set()> {};
+    /**
+     * @brief Specialization of `node_has_set` for types with a `set` member function.
+     *
+     * This specialization enables `node_has_set` for types that have a member function
+     * named `has_set`. It derives from std::integral_constant with a boolean value
+     * indicating the presence of the `has_set` function.
+     *
+     * @tparam TYPE The type to check.
+     */
+    template <class TYPE>
+    struct node_has_set<TYPE,
+                        std::enable_if_t<std::is_invocable_r<bool, decltype(TYPE::has_set)>::value>>
+        : std::integral_constant<bool, TYPE::has_set()>
+    {
+    };
 
-template <class LIB>
-constexpr bool node_has_set_v = node_has_set<LIB>::value;
+    /**
+     * @brief Convenience variable template to check if a type has a `set` member function.
+     *
+     * This variable template provides a boolean value indicating whether a given type
+     * has a member function named `has_set`. It uses the `node_has_set` type trait.
+     *
+     * @tparam TYPE The type to check.
+     */
+    template <class TYPE>
+    constexpr bool node_has_set_v = node_has_set<TYPE>::value;
 
-template <class LIB, class = void>
-struct node_has_get : std::false_type {};
+    /**
+     * @brief Type trait to check if a type has a `get` member function.
+     *
+     * This type trait checks if a given type has a member function named `has_get`.
+     * It is used to determine if a type supports the `get` operation.
+     *
+     * @tparam TYPE The type to check.
+     */
+    template <class TYPE, class = void>
+    struct node_has_get : std::false_type
+    {
+    };
 
-template <class LIB>
-struct node_has_get<LIB,
-                    std::enable_if_t<std::is_invocable_r<bool, decltype(LIB::has_get)>::value>>
-    : std::integral_constant<bool, LIB::has_get()> {};
+    /**
+     * @brief Specialization of `node_has_get` for types with a `get` member function.
+     *
+     * This specialization enables `node_has_get` for types that have a member function
+     * named `has_get`. It derives from std::integral_constant with a boolean value
+     * indicating the presence of the `has_get` function.
+     *
+     * @tparam TYPE The type to check.
+     */
+    template <class TYPE>
+    struct node_has_get<TYPE,
+                        std::enable_if_t<std::is_invocable_r<bool, decltype(TYPE::has_get)>::value>>
+        : std::integral_constant<bool, TYPE::has_get()>
+    {
+    };
 
-template <class LIB>
-constexpr bool node_has_get_v = node_has_get<LIB>::value;
+    /**
+     * @brief Convenience variable template to check if a type has a `get` member function.
+     *
+     * This variable template provides a boolean value indicating whether a given type
+     * has a member function named `has_get`. It uses the `node_has_get` type trait.
+     *
+     * @tparam TYPE The type to check.
+     */
+    template <class TYPE>
+    constexpr bool node_has_get_v = node_has_get<TYPE>::value;
+
 }
 
 #endif // !_HALCPP_UTILS_H_
