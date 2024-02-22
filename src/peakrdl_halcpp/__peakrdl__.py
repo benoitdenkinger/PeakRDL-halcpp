@@ -38,9 +38,8 @@ class Exporter(ExporterSubcommandPlugin):
             dest="skip_buses",
             default=False,
             action="store_true",
-            help="If there is an addrmap containing only addrmaps, not registers, by \
-                default it will be omitted in hierarchy, it is possible to keep it by \
-                passing --keep-buses flag."
+            help="Addrmaps containing only addrmaps, not registers, can be removed by \
+                passing --skip-buses flag."
         )
 
     def do_export(self, top_node: 'AddrmapNode', options: 'argparse.Namespace') -> None:
@@ -51,5 +50,5 @@ class Exporter(ExporterSubcommandPlugin):
             outdir=options.output,
             list_files=options.list_files,
             ext_modules=options.ext,
-            skip_buses=options.skip_buses,
+            skip_buses=True, #options.skip_buses,
         )

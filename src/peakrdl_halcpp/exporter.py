@@ -126,68 +126,76 @@ class HalExporter():
         # Create top HalAddrmapNode from top AddrmapNode
         top = HalAddrmapNode(node)
 
-        if list_files:
-            # Only print the files that would be generated
-            self.list_files(top, outdir)
-        else:
-            # Create the output directory for the generated files
-            try:
-                os.makedirs(outdir)
-            except FileExistsError:
-                pass
+        for child in top.haldescendants(skip_buses=skip_buses, bus_offset=0):
+            if not isinstance(child, HalFieldNode):
+                print(f'Child is {child} with address_offset {hex(child.address_offset)}')
+            # print(f'{child.is_bus}')
+            # print(f'{skip_buses}')
+            if child.is_bus and skip_buses:
+                print('Not working child {child} is a bus')
 
-            # Iterate over all the HalAddrmap objects New class
-            concatenated_iterable = chain(top.descendants_of_type(HalAddrmapNode), top)
-            # Bus offset correction
-            bus_offset = 0
-            for halnode in concatenated_iterable:
-                # print('++++++++++++ HALNODE ++++++++++++')
-                # print(halnode)
-                # print(f'Halnode original type name: {halnode.orig_type_name}')
-                # print(f'Halnode type name: {halnode.type_name}')
-                # print(f'Halnode inst name: {halnode.inst_name}')
-                context = {
-                    'halnode': halnode,
-                    'HalAddrmapNode' : HalAddrmapNode,
-                    'HalMemNode' : HalMemNode,
-                    'HalRegfileNode' : HalRegfileNode,
-                    'HalRegNode' : HalRegNode,
-                    'HalFieldNode' : HalFieldNode,
-                    'halutils': halutils,
-                }
+        # if list_files:
+        #     # Only print the files that would be generated
+        #     self.list_files(top, outdir)
+        # else:
+        #     # Create the output directory for the generated files
+        #     try:
+        #         os.makedirs(outdir)
+        #     except FileExistsError:
+        #         pass
 
-                print(f'Current bus_offset: {bus_offset}')
-                print(f'Halnode: {halnode}')
-                print(f'Halnode parent: {halnode.parent}')
-                print(f'Halnode is top: {halnode.is_top_node}')
+        #     # Iterate over all the HalAddrmap objects New class
+        #     concatenated_iterable = chain(top.descendants_of_type(HalAddrmapNode), top)
+        #     # Bus offset correction
+        #     bus_offset = 0
+        #     for halnode in concatenated_iterable:
+        #         # print('++++++++++++ HALNODE ++++++++++++')
+        #         # print(halnode)
+        #         # print(f'Halnode original type name: {halnode.orig_type_name}')
+        #         # print(f'Halnode type name: {halnode.type_name}')
+        #         # print(f'Halnode inst name: {halnode.inst_name}')
+        #         context = {
+        #             'halnode': halnode,
+        #             'HalAddrmapNode' : HalAddrmapNode,
+        #             'HalMemNode' : HalMemNode,
+        #             'HalRegfileNode' : HalRegfileNode,
+        #             'HalRegNode' : HalRegNode,
+        #             'HalFieldNode' : HalFieldNode,
+        #             'halutils': halutils,
+        #         }
 
-                # Decide wether or not to generate the file
-                if (halnode.is_bus and not halnode.is_top_node) and skip_buses:
-                    generate_tmpl = False
-                    print(f'Halnode {halnode} is a bus and skipped')
-                else:
-                    generate_tmpl = True
-                    print(f'Halnode {halnode} is generated')
+        #         print(f'Current bus_offset: {bus_offset}')
+        #         print(f'Halnode: {halnode}')
+        #         print(f'Halnode parent: {halnode.parent}')
+        #         print(f'Halnode is top: {halnode.is_top_node}')
 
-                if generate_tmpl:
-                    # Add the bus offset if any
-                    halnode.bus_offset = bus_offset
-                    # The next lines generate the C++ header file for the
-                    # HalAddrmap node using a jinja2 template.
-                    text = self.process_template(context)
-                    out_file = os.path.join(outdir, halnode.inst_name_hal.lower() + ".h")
-                    with open(out_file, 'w') as f:
-                        f.write(text)
-                    # Reset the bus offset
-                    bus_offset = 0
-                else:
-                    # This node is a bus and we don't want to keep it
-                    bus_offset += halnode.address_offset
+        #         # Decide wether or not to generate the file
+        #         if (halnode.is_bus and not halnode.is_top_node) and skip_buses:
+        #             generate_tmpl = False
+        #             print(f'Halnode {halnode} is a bus and skipped')
+        #         else:
+        #             generate_tmpl = True
+        #             print(f'Halnode {halnode} is generated')
+
+        #         if generate_tmpl:
+        #             # Add the bus offset if any
+        #             halnode.bus_offset = bus_offset
+        #             # The next lines generate the C++ header file for the
+        #             # HalAddrmap node using a jinja2 template.
+        #             text = self.process_template(context)
+        #             out_file = os.path.join(outdir, halnode.inst_name_hal.lower() + ".h")
+        #             with open(out_file, 'w') as f:
+        #                 f.write(text)
+        #             # Reset the bus offset
+        #             bus_offset = 0
+        #         else:
+        #             # This node is a bus and we don't want to keep it
+        #             bus_offset += halnode.address_offset
 
 
 
-            # Copy the base header files (fixed code) to the output directory
-            self.copy_base_headers(outdir)
+        #     # Copy the base header files (fixed code) to the output directory
+        #     self.copy_base_headers(outdir)
 
     def process_template(self, context: Dict) -> str:
         """Generates a C++ header file based on a given HalAddrmap node and

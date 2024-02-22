@@ -20,6 +20,10 @@ class HalBaseNode(Node):
         """Return the node name with the '_hal' suffix"""
         return super().inst_name.lower() + "_hal"
 
+    @property
+    def is_bus(self) -> bool:
+        return False
+
     def get_docstring(self) -> str:
         """Converts the node description into a C++ multi-line comment."""
         desc = "/*\n"
@@ -51,20 +55,15 @@ class HalBaseNode(Node):
 
     def halunrolled(self) -> Iterator['Node']:
         cls = type(self)
-        # print('++++++++++++++ halunrolled() ++++++++++++++')
-        # print(cls)
         if isinstance(self, AddressableNode) and self.is_array: # pylint: disable=no-member
-            # print('It is an array from halunrolled()')
             # Is an array. Yield a Node object for each instance
             range_list = [range(n) for n in self.array_dimensions] # pylint: disable=no-member
             for idxs in itertools.product(*range_list):
-                # N = cls(self.inst, self.env, self.parent)
                 N = cls(self)
                 N.current_idx = idxs # type: ignore
                 yield N
         else:
             # not an array. Nothing to unroll
-            # print('Not an array from halunrolled()')
             yield cls(self.inst, self.env, self.parent)
 
     def halchildren(self, unroll: bool=False, skip_not_present: bool=True, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
@@ -86,6 +85,7 @@ class HalBaseNode(Node):
                         continue
                     else:
                         N.current_idx = idxs  # type: ignore # pylint: disable=attribute-defined-outside-init
+                        N.bus_offset = bus_offset
                         yield N
             else:
                 N = HalBaseNode._halfactory(child, self.env, self)
@@ -93,6 +93,7 @@ class HalBaseNode(Node):
                 if N is None:
                     continue
                 else:
+                    N.bus_offset = bus_offset
                     yield N
 
     def children_of_type(self, children_type : 'Node', unroll: bool=False, skip_not_present: bool=True) -> Iterator['Node']:
@@ -100,15 +101,19 @@ class HalBaseNode(Node):
             if isinstance(child, children_type):
                 yield child
 
-    def haldescendants(self, unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False) -> Iterator['Node']:
-        for child in self.halchildren(unroll, skip_not_present):
-            if in_post_order:
-                yield from child.haldescendants(unroll, skip_not_present, in_post_order)
+    def haldescendants(self, unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False, skip_buses: bool=False, bus_offset: int=0) -> Iterator['Node']:
+        if skip_buses and self.is_bus:
+            bus_offset += self.address_offset
 
-            yield child
+        for child in self.halchildren(unroll, skip_not_present, skip_buses, bus_offset):
+            if in_post_order:
+                yield from child.haldescendants(unroll, skip_not_present, in_post_order, skip_buses, bus_offset)
+
+            if not (skip_buses and child.is_bus):
+                yield child
 
             if not in_post_order:
-                yield from child.haldescendants(unroll, skip_not_present, in_post_order)
+                yield from child.haldescendants(unroll, skip_not_present, in_post_order, skip_buses, bus_offset)
 
     def descendants_of_type(self, descendants_type : 'Node', unroll: bool=False, skip_not_present: bool=True, in_post_order: bool=False) -> Iterator['Node']:
         for child in self.haldescendants(unroll, skip_not_present):
