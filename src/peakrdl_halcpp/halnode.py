@@ -9,7 +9,28 @@ if TYPE_CHECKING:
 
 
 class HalBaseNode(Node):
-    """HAL node base class. This class inherits from the systemrdl Node class."""
+    """HAL node base class.
+
+    This class inherits from the systemrdl Node class. Each subclass will also inherit
+    its systemrdl Node subclass specialization counterpart (e.g, HalFieldNode inherits
+    from FieldNode).
+
+    .. inheritance-diagram:: peakrdl_halcpp.halnode.HalAddrmapNode
+                             peakrdl_halcpp.halnode.HalRegNode
+                             peakrdl_halcpp.halnode.HalMemNode
+                             peakrdl_halcpp.halnode.HalRegfileNode
+                             peakrdl_halcpp.halnode.HalFieldNode
+        :top-classes: HalBaseNode
+        :parts: 1
+
+    Class methods:
+
+        - :func:`get_docstring`
+        - :func:`_halfactory`
+        - :func:`halunrolled`
+        - :func:`halchildren`
+        - :func:`haldescendants`
+    """
 
     def __iter__(self):
         # Make this class iterable
@@ -102,6 +123,12 @@ class HalBaseNode(Node):
 
 
 class HalFieldNode(HalBaseNode, FieldNode):
+    """HalFieldNode class inheriting from HalBaseNode class and systemrdl FieldNode class.
+
+        Class methods:
+
+        - :func:`get_enums`
+    """
     def __init__(self, node: FieldNode):
         # Use the system-RDL AddrmapNode class initialization
         super().__init__(node.inst, node.env, node.parent)
@@ -150,6 +177,13 @@ class HalFieldNode(HalBaseNode, FieldNode):
 
 
 class HalRegNode(HalBaseNode, RegNode):
+    """HalRegNode class inheriting from HalBaseNode class and systemrdl RegNode class.
+
+        Class methods:
+
+        - :func:`get_template_line`
+        - :func:`get_cls_tmpl_params`
+    """
     def __init__(self, node: RegNode):
         # Use the system-RDL AddrmapNode class initialization
         super().__init__(node.inst, node.env, node.parent)
@@ -192,6 +226,13 @@ class HalRegNode(HalBaseNode, RegNode):
 
 
 class HalRegfileNode(HalBaseNode, RegfileNode):
+    """HalRegfileNode class inheriting from HalBaseNode class and systemrdl RegfileNode class.
+
+        Class methods:
+
+        - :func:`get_template_line`
+        - :func:`get_cls_tmpl_params`
+    """
     def __init__(self, node: RegfileNode):
         # Use the system-RDL AddrmapNode class initialization
         super().__init__(node.inst, node.env, node.parent)
@@ -228,6 +269,13 @@ class HalRegfileNode(HalBaseNode, RegfileNode):
 
 
 class HalMemNode(HalBaseNode, MemNode):
+    """HalMemNode class inheriting from HalBaseNode class and systemrdl MemNode class.
+
+        Class methods:
+
+        - :func:`get_template_line`
+        - :func:`get_cls_tmpl_params`
+    """
     def __init__(self, node: MemNode):
         # Use the system-RDL MemNode class initialization
         super().__init__(node.inst, node.env, node.parent)
@@ -260,6 +308,13 @@ class HalMemNode(HalBaseNode, MemNode):
 
 
 class HalAddrmapNode(HalBaseNode, AddrmapNode):
+    """HalAddrmapNode class inheriting from HalBaseNode class and systemrdl AddrmapNode class.
+
+        Class methods:
+
+        - :func:`get_template_line`
+        - :func:`get_cls_tmpl_params`
+    """
     def __init__(self, node: AddrmapNode):
         # Use the system-RDL AddrmapNode class initialization
         super().__init__(node.inst, node.env, node.parent)
