@@ -65,7 +65,11 @@ add_custom_target(
 # Only @MY_VAR@ format is replaced to avoid replacing structure like ${MY_VAR} which are used in other
 # languages or file format (e.g., in Makefiles).
 configure_file(${PROJECT_SOURCE_DIR}/sphinx_config/conf.py.in ${SPHINX_TMPL_DIR}/conf.py_t @ONLY)
+
+# This template is not used by sphinx-apidoc for unknwown reason so it is also copied directly to
+# the source file. No change is expected from sphinx-apidoc as cmake already takes care of this.
 configure_file(${PROJECT_SOURCE_DIR}/sphinx_config/Makefile.in ${SPHINX_TMPL_DIR}/Makefile_t @ONLY)
+configure_file(${PROJECT_SOURCE_DIR}/sphinx_config/Makefile.in ${API_SPHINX_SRC_DIR}/Makefile @ONLY)
 
 # Now build the docusaurus documentation using npm
 find_program(NPM_EXECUTABLE npm)
@@ -80,8 +84,8 @@ add_custom_command(
         COMMAND touch ${DOCUSAURUS_STAMP_FILE}
         COMMAND ${NPM_EXECUTABLE} install docusaurus
         COMMAND ${NPM_EXECUTABLE} run build ${PROJECT_SOURCE_DIR} -- --out-dir ${DOCUSAURUS_OUT_DIR}
-        # API static html is copied and added as a simple link (didn't find a nicer solution yet)
         COMMAND cp -r ${API_SPHINX_BUILD_DIR}/html ${DOCUSAURUS_OUT_DIR}/api_html
+        # API static html is copied and added as a simple link (didn't find a nicer solution yet)
         DEPENDS api_doc
         COMMENT "Installing and Building Docusaurus"
 )

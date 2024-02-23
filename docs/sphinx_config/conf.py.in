@@ -49,7 +49,7 @@ inheritance_node_attrs = dict(
 
 inheritance_graph_attrs = dict(rankdir="TB")
 
-# templates_path = ['{{ dot }}templates']
+templates_path = ['{{ dot }}templates']
 exclude_patterns = [{{ exclude_patterns }}]
 
 {% if suffix != '.rst' -%}
@@ -69,6 +69,8 @@ language = {{ language | repr }}
 
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['{{ dot }}static']
+html_baseurl = '/PeakRDL-halcpp/api_html/'
+
 {% if 'sphinx.ext.intersphinx' in extensions %}
 # -- Options for intersphinx extension ---------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html#configuration
